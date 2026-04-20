@@ -11,7 +11,6 @@ interface GanttCornerProps {
 export default function GanttCorner({ onZoomIn, onZoomOut }: GanttCornerProps) {
   return (
     <div
-      className="sticky-corner"
       style={{
         height: 'var(--header-height)',
         display: 'flex',

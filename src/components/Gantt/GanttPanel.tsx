@@ -238,7 +238,7 @@ export default function GanttPanel({
           }}
         >
           {/* Row 1 Col 1: Corner (sticky top-left) */}
-          <div style={{ gridRow: 1, gridColumn: 1 }}>
+          <div className="sticky-corner" style={{ gridRow: 1, gridColumn: 1 }}>
             <GanttCorner onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} />
           </div>
 
