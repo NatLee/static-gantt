@@ -88,4 +88,6 @@ export type GanttAction =
   | { type: 'REORDER_PHASES'; orderedPhases: string[] }
   | { type: 'REORDER_SUB_PHASES'; masterPhase: string; orderedSubPhases: string[] }
   | { type: 'MOVE_REORDER_TASK'; taskId: string; targetPhase: string; insertBeforeTaskId?: string }
-  | { type: 'MOVE_SUB_PHASE'; subPhase: string; sourceMasterPhase: string; targetMasterPhase: string; insertBeforeSubPhase?: string };
+  | { type: 'MOVE_SUB_PHASE'; subPhase: string; sourceMasterPhase: string; targetMasterPhase: string; insertBeforeSubPhase?: string }
+  | { type: 'MOVE_TASK_WITH_REORDER'; taskId: string; newStartDate: string; targetPhase: string; insertBeforeTaskId?: string }
+  | { type: 'ADD_TASK_DEPENDENCY'; taskId: string; predecessorId: string };

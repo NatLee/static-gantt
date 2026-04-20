@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { ComputedTask } from '@/types';
 import { PIXELS_PER_DAY, ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
+import { buildDepPath, buildArrowHead } from '@/lib/depPath';
 
 interface DependencyLinesProps {
   computed: ComputedTask[];
@@ -50,25 +51,8 @@ export default function DependencyLines({
         const ex = (task.startDayOffset - timelineStartDay) * ppd;
         const ey = taskRowIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
 
-        const gap = ex - sx;
-        let d: string;
-
-        if (gap > 20) {
-          // Right angle path
-          const mx = sx + gap / 2;
-          d = `M ${sx} ${sy} L ${mx} ${sy} L ${mx} ${ey} L ${ex} ${ey}`;
-        } else {
-          // Bezier curve for tight spaces
-          const cpOffset = Math.max(30, Math.abs(ey - sy) * 0.4);
-          d = `M ${sx} ${sy} C ${sx + cpOffset} ${sy}, ${ex - cpOffset} ${ey}, ${ex} ${ey}`;
-        }
-
-        // Arrowhead
-        const arrowSize = 5;
-        const arrows = [
-          `M ${ex} ${ey} L ${ex - arrowSize} ${ey - arrowSize}`,
-          `M ${ex} ${ey} L ${ex - arrowSize} ${ey + arrowSize}`,
-        ];
+        const d = buildDepPath(sx, sy, ex, ey);
+        const arrows = buildArrowHead(ex, ey);
 
         result.push({
           d,

@@ -13,6 +13,8 @@ import GanttCorner from './GanttCorner';
 import { ROW_HEIGHT, PIXELS_PER_DAY, Z } from '@/lib/ganttLayout';
 import { useResizableSidebar } from '@/hooks/useResizableSidebar';
 import { useVirtualRows } from '@/hooks/useVirtualRows';
+import { useDragToConnect } from '@/hooks/useDragToConnect';
+import { buildDepPath, buildArrowHead } from '@/lib/depPath';
 
 interface GanttPanelProps {
   state: GanttState;
@@ -92,6 +94,7 @@ export default function GanttPanel({
 }: GanttPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const exportTargetRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const datePointerRef = useRef<HTMLDivElement>(null);
   const dateTooltipRef = useRef<HTMLDivElement>(null);
   const isExtendingRef = useRef(false);
@@ -122,6 +125,15 @@ export default function GanttPanel({
   const totalHeight = totalRows * ROW_HEIGHT;
 
   const virtualWindow = useVirtualRows(scrollContainerRef, totalRows);
+
+  const connect = useDragToConnect({
+    tasks: state.tasks,
+    taskMap,
+    dispatch,
+    zoomScale: state.zoomScale,
+    timelineStartDay: state.timelineStartDay,
+    gridRef,
+  });
 
   // Update CSS variable for grid background
   useEffect(() => {
@@ -276,6 +288,7 @@ export default function GanttPanel({
           {/* Row 2 Col 2: Grid Layer */}
           <div
             className="gantt-grid"
+            ref={gridRef}
             style={{
               gridRow: 2,
               gridColumn: 2,
@@ -346,7 +359,61 @@ export default function GanttPanel({
               state={state}
               dispatch={dispatch}
               virtualWindow={virtualWindow}
+              hierarchy={hierarchy}
+              onStartConnect={connect.startConnect}
+              hoveredTargetId={connect.hoveredTargetId}
+              isConnecting={connect.isConnecting}
             />
+            {connect.previewLine && (
+              <svg
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: totalWidth,
+                  height: totalHeight,
+                  pointerEvents: 'none',
+                  zIndex: Z.overlay,
+                }}
+              >
+                <path
+                  d={buildDepPath(
+                    connect.previewLine.sx,
+                    connect.previewLine.sy,
+                    connect.previewLine.ex,
+                    connect.previewLine.ey
+                  )}
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth={2}
+                  strokeDasharray="5 3"
+                />
+                {buildArrowHead(connect.previewLine.ex, connect.previewLine.ey).map((ad, j) => (
+                  <path key={j} d={ad} fill="none" stroke="var(--accent)" strokeWidth={2} />
+                ))}
+              </svg>
+            )}
+            {connect.rejectReason === 'cycle' && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 8,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'var(--bg-card)',
+                  border: '1px solid #f87171',
+                  color: '#f87171',
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  pointerEvents: 'none',
+                  zIndex: Z.overlay + 1,
+                }}
+              >
+                無法建立：會造成循環依賴
+              </div>
+            )}
           </div>
         </div>
       </div>

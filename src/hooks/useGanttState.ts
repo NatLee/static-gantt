@@ -277,6 +277,42 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
       return { ...state, tasks };
     }
 
+    case 'MOVE_TASK_WITH_REORDER': {
+      const existing = state.tasks.find(t => t.id === action.taskId);
+      if (!existing) return state;
+      const updated = {
+        ...existing,
+        start: action.newStartDate,
+        after: undefined,
+        phase: action.targetPhase,
+      };
+      const tasks = state.tasks.filter(t => t.id !== action.taskId);
+      if (action.insertBeforeTaskId) {
+        const idx = tasks.findIndex(t => t.id === action.insertBeforeTaskId);
+        if (idx >= 0) tasks.splice(idx, 0, updated);
+        else tasks.push(updated);
+      } else {
+        let lastIdx = -1;
+        tasks.forEach((t, i) => { if (t.phase === action.targetPhase) lastIdx = i; });
+        if (lastIdx >= 0) tasks.splice(lastIdx + 1, 0, updated);
+        else tasks.push(updated);
+      }
+      return { ...state, tasks };
+    }
+
+    case 'ADD_TASK_DEPENDENCY': {
+      const tasks = state.tasks.map(t => {
+        if (t.id !== action.taskId) return t;
+        const existing = t.after ? t.after.split(',').map(s => s.trim()).filter(Boolean) : [];
+        if (existing.includes(action.predecessorId)) return t;
+        const after = [...existing, action.predecessorId].join(',');
+        const next = { ...t, after };
+        delete next.start;
+        return next;
+      });
+      return { ...state, tasks };
+    }
+
     case 'MOVE_SUB_PHASE': {
       const oldPhase = `${action.sourceMasterPhase} ${action.subPhase}`;
       const newPhase = `${action.targetMasterPhase} ${action.subPhase}`;
