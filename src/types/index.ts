@@ -9,6 +9,11 @@ export interface Task {
   isCritical: boolean;
   start?: string;
   after?: string;
+  progress?: number; // 0-100
+  color?: string; // hex like '#ef4444' or a palette key
+  tags?: string[];
+  assignee?: string;
+  description?: string;
 }
 
 export interface ComputedTask extends Task {
@@ -53,9 +58,41 @@ export interface GanttState {
   collapsedPhases: Set<string>;
   collapsedSubPhases: Set<string>;
   editingTaskId: string | null;
+  highlightedTaskId: string | null;
   activeDialog: DialogState | null;
   timelineStartDay: number;
   timelineEndDay: number;
+  legendVisible: boolean;
+}
+
+export interface SerializableGanttState {
+  tasks: Task[];
+  milestones: Milestone[];
+  currentFilter: string;
+  zoomScale: number;
+  collapsedPhases: string[];
+  collapsedSubPhases: string[];
+  timelineStartDay: number;
+  timelineEndDay: number;
+}
+
+export interface ProjectFile {
+  version: 1;
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  state: SerializableGanttState;
+}
+
+export interface AppStorage {
+  version: 1;
+  projects: ProjectFile[];
+  activeProjectId: string;
+  preferences: {
+    isDark: boolean;
+    currentMode: 'visual' | 'mermaid';
+  };
 }
 
 export type GanttAction =
@@ -90,4 +127,10 @@ export type GanttAction =
   | { type: 'MOVE_REORDER_TASK'; taskId: string; targetPhase: string; insertBeforeTaskId?: string }
   | { type: 'MOVE_SUB_PHASE'; subPhase: string; sourceMasterPhase: string; targetMasterPhase: string; insertBeforeSubPhase?: string }
   | { type: 'MOVE_TASK_WITH_REORDER'; taskId: string; newStartDate: string; targetPhase: string; insertBeforeTaskId?: string }
-  | { type: 'ADD_TASK_DEPENDENCY'; taskId: string; predecessorId: string };
+  | { type: 'ADD_TASK_DEPENDENCY'; taskId: string; predecessorId: string }
+  | { type: 'SET_HIGHLIGHTED_TASK'; taskId: string | null }
+  | { type: 'DUPLICATE_TASK'; taskId: string; newId: string }
+  | { type: 'LOAD_PROJECT_STATE'; state: SerializableGanttState }
+  | { type: 'COLLAPSE_ALL_PHASES' }
+  | { type: 'EXPAND_ALL_PHASES' }
+  | { type: 'TOGGLE_LEGEND_VISIBLE' };

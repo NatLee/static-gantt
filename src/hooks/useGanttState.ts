@@ -1,8 +1,9 @@
-import { useReducer, useMemo } from 'react';
+import { useMemo } from 'react';
 import { GanttState, GanttAction, ComputedTask, HierarchyMap } from '@/types';
 import { defaultTasks, defaultMilestones, PROJECT_START_DATE } from '@/data/defaultProject';
 import { computeSchedule, buildHierarchy, computeTimelineBounds } from '@/lib/scheduler';
 import { rewireDependencies } from '@/lib/dependencyRewire';
+import { useUndoableReducer } from './useUndoableReducer';
 
 const initialBounds = computeTimelineBounds(
   computeSchedule(defaultTasks),
@@ -20,9 +21,11 @@ const initialState: GanttState = {
   collapsedPhases: new Set<string>(),
   collapsedSubPhases: new Set<string>(),
   editingTaskId: null,
+  highlightedTaskId: null,
   activeDialog: null,
   timelineStartDay: initialBounds.startDay,
   timelineEndDay: initialBounds.endDay,
+  legendVisible: true,
 };
 
 function ganttReducer(state: GanttState, action: GanttAction): GanttState {
@@ -300,6 +303,43 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
       return { ...state, tasks };
     }
 
+    case 'SET_HIGHLIGHTED_TASK':
+      return { ...state, highlightedTaskId: action.taskId };
+
+    case 'DUPLICATE_TASK': {
+      const idx = state.tasks.findIndex(t => t.id === action.taskId);
+      if (idx < 0) return state;
+      const original = state.tasks[idx];
+      const copy = {
+        ...original,
+        id: action.newId,
+        name: `${original.name} (copy)`,
+        after: original.id,
+        start: undefined,
+      };
+      const tasks = [...state.tasks];
+      tasks.splice(idx + 1, 0, copy);
+      return { ...state, tasks };
+    }
+
+    case 'LOAD_PROJECT_STATE': {
+      const s = action.state;
+      return {
+        ...state,
+        tasks: s.tasks,
+        milestones: s.milestones,
+        currentFilter: s.currentFilter,
+        zoomScale: s.zoomScale,
+        collapsedPhases: new Set(s.collapsedPhases),
+        collapsedSubPhases: new Set(s.collapsedSubPhases),
+        timelineStartDay: s.timelineStartDay,
+        timelineEndDay: s.timelineEndDay,
+        editingTaskId: null,
+        highlightedTaskId: null,
+        activeDialog: null,
+      };
+    }
+
     case 'ADD_TASK_DEPENDENCY': {
       const tasks = state.tasks.map(t => {
         if (t.id !== action.taskId) return t;
@@ -312,6 +352,22 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
       });
       return { ...state, tasks };
     }
+
+    case 'COLLAPSE_ALL_PHASES': {
+      const phaseRegex = /^(Phase \d+)/;
+      const masters = new Set<string>();
+      state.tasks.forEach(t => {
+        const m = t.phase.match(phaseRegex);
+        if (m) masters.add(m[1]);
+      });
+      return { ...state, collapsedPhases: masters };
+    }
+
+    case 'EXPAND_ALL_PHASES':
+      return { ...state, collapsedPhases: new Set(), collapsedSubPhases: new Set() };
+
+    case 'TOGGLE_LEGEND_VISIBLE':
+      return { ...state, legendVisible: !state.legendVisible };
 
     case 'MOVE_SUB_PHASE': {
       const oldPhase = `${action.sourceMasterPhase} ${action.subPhase}`;
@@ -349,8 +405,35 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
   }
 }
 
+const NON_UNDOABLE_ACTIONS = new Set<GanttAction['type']>([
+  'SET_FILTER',
+  'SET_MODE',
+  'TOGGLE_THEME',
+  'SET_ZOOM',
+  'TOGGLE_PHASE_COLLAPSE',
+  'TOGGLE_SUB_PHASE_COLLAPSE',
+  'OPEN_TASK_EDITOR',
+  'CLOSE_TASK_EDITOR',
+  'OPEN_DIALOG',
+  'CLOSE_DIALOG',
+  'EXTEND_TIMELINE',
+  'LOAD_PROJECT_STATE',
+  'SET_HIGHLIGHTED_TASK',
+  'COLLAPSE_ALL_PHASES',
+  'EXPAND_ALL_PHASES',
+  'TOGGLE_LEGEND_VISIBLE',
+]);
+
+function isUndoable(action: GanttAction): boolean {
+  return !NON_UNDOABLE_ACTIONS.has(action.type);
+}
+
 export function useGanttState() {
-  const [state, dispatch] = useReducer(ganttReducer, initialState);
+  const [state, dispatch, history] = useUndoableReducer(
+    ganttReducer,
+    initialState,
+    { isUndoable, maxHistory: 50 }
+  );
 
   const computed = useMemo<ComputedTask[]>(() => computeSchedule(state.tasks), [state.tasks]);
   const hierarchy = useMemo<HierarchyMap>(() => buildHierarchy(computed), [computed]);
@@ -370,16 +453,18 @@ export function useGanttState() {
   const timelineStartDay = Math.min(state.timelineStartDay, bounds.startDay);
   const timelineEndDay = Math.max(state.timelineEndDay, bounds.endDay);
 
+  const effectiveState = useMemo(
+    () => ({ ...state, timelineStartDay, timelineEndDay }),
+    [state, timelineStartDay, timelineEndDay]
+  );
+
   return {
-    state: {
-      ...state,
-      timelineStartDay,
-      timelineEndDay,
-    },
+    state: effectiveState,
     dispatch,
     computed,
     hierarchy,
     taskMap,
     masterPhases,
+    history,
   };
 }

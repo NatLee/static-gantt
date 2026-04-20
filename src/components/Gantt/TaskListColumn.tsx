@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ChevronDown, Plus, FolderOpen, CheckCircle2, Clock4, CircleDashed, GripVertical } from 'lucide-react';
-import { GanttState, GanttAction, HierarchyMap } from '@/types';
+import { ComputedTask, GanttState, GanttAction, HierarchyMap } from '@/types';
 import { useDragReorder, DragSource } from '@/hooks/useDragReorder';
 import { ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
+import TaskContextMenu from './TaskContextMenu';
 
 interface TaskListColumnProps {
   hierarchy: HierarchyMap;
@@ -22,6 +23,86 @@ function StatusIcon({ status }: { status: string }) {
   return <CircleDashed size={14} className="text-slate-400" />;
 }
 
+function TagChips({ tags }: { tags: string[] }) {
+  const visible = tags.slice(0, 2);
+  const rest = tags.length - visible.length;
+  return (
+    <span style={{ display: 'flex', gap: 3, marginLeft: 6, flexShrink: 0 }}>
+      {visible.map((t) => (
+        <span
+          key={t}
+          title={t}
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            padding: '1px 5px',
+            borderRadius: 4,
+            background: 'var(--accent-glow)',
+            color: 'var(--accent)',
+            maxWidth: 60,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {t}
+        </span>
+      ))}
+      {rest > 0 && (
+        <span
+          title={tags.slice(2).join(', ')}
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            padding: '1px 5px',
+            borderRadius: 4,
+            color: 'var(--text-secondary)',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+          }}
+        >
+          +{rest}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function AssigneeAvatar({ name }: { name: string }) {
+  const initials = name
+    .split(/\s+/)
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  // Deterministic hue from name
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  const hue = Math.abs(hash) % 360;
+  return (
+    <span
+      title={name}
+      style={{
+        marginLeft: 6,
+        width: 18,
+        height: 18,
+        borderRadius: '50%',
+        background: `hsl(${hue} 70% 45%)`,
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: 800,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}
+    >
+      {initials || '?'}
+    </span>
+  );
+}
+
 export default function TaskListColumn({
   hierarchy,
   state,
@@ -35,6 +116,7 @@ export default function TaskListColumn({
     (rowIdx >= virtualWindow.startIndex && rowIdx <= virtualWindow.endIndex);
   const { currentFilter, collapsedPhases, collapsedSubPhases } = state;
   const masterPhases = Object.keys(hierarchy);
+  const [contextMenu, setContextMenu] = useState<{ task: ComputedTask; x: number; y: number } | null>(null);
 
   const { startDrag, isDragging, dragSource, dropIndicatorRow } = useDragReorder(
     hierarchy,
@@ -236,6 +318,10 @@ export default function TaskListColumn({
             onClick={() => {
               if (!isDragging) dispatch({ type: 'OPEN_TASK_EDITOR', taskId: task.id });
             }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setContextMenu({ task, x: e.clientX, y: e.clientY });
+            }}
           >
             <span
               className="drag-handle"
@@ -268,6 +354,8 @@ export default function TaskListColumn({
             >
               {task.name}
             </span>
+            {task.tags && task.tags.length > 0 && <TagChips tags={task.tags} />}
+            {task.assignee && <AssigneeAvatar name={task.assignee} />}
           </div>
         );
         rowIndex++;
@@ -388,6 +476,16 @@ export default function TaskListColumn({
             left: 8,
             right: 8,
           }}
+        />
+      )}
+
+      {contextMenu && (
+        <TaskContextMenu
+          task={contextMenu.task}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          dispatch={dispatch}
+          onClose={() => setContextMenu(null)}
         />
       )}
     </div>

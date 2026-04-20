@@ -20,13 +20,19 @@ export async function exportToExcel(tasks: ComputedTask[], filter: string) {
 
     data.push({
       'Phase': t.phase,
+      'Task ID': t.id,
       'Task Name': t.name,
       'Status': st,
+      'Progress (%)': typeof t.progress === 'number' ? t.progress : 0,
       'Duration (days)': t.duration,
       'Start Date': formatISO(sd),
       'End Date': formatISO(ed),
       'Critical Path': t.isCritical ? 'Yes' : 'No',
       'Predecessor': t.after || 'None',
+      'Assignee': t.assignee || '',
+      'Tags': (t.tags || []).join(', '),
+      'Color': t.color || '',
+      'Description': t.description || '',
     });
   });
 

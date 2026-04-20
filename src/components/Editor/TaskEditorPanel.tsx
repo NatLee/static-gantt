@@ -3,6 +3,17 @@
 import { Dispatch, useEffect, useState, useCallback, useMemo } from 'react';
 import { GanttState, GanttAction, ComputedTask, TaskStatus } from '@/types';
 
+const COLOR_SWATCHES = [
+  '#ef4444', // red
+  '#f97316', // orange
+  '#eab308', // yellow
+  '#22c55e', // green
+  '#06b6d4', // cyan
+  '#3b82f6', // blue
+  '#a855f7', // purple
+  '#ec4899', // pink
+];
+
 interface TaskEditorPanelProps {
   state: GanttState;
   dispatch: Dispatch<GanttAction>;
@@ -20,6 +31,11 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
   const [isCritical, setIsCritical] = useState(task?.isCritical ?? false);
   const [after, setAfter] = useState(task?.after ?? '');
   const [start, setStart] = useState(task?.start ?? '');
+  const [progress, setProgress] = useState(task?.progress ?? 0);
+  const [color, setColor] = useState(task?.color ?? '');
+  const [tagsInput, setTagsInput] = useState((task?.tags ?? []).join(', '));
+  const [assignee, setAssignee] = useState(task?.assignee ?? '');
+  const [description, setDescription] = useState(task?.description ?? '');
 
   const handleClose = useCallback(() => {
     dispatch({ type: 'CLOSE_TASK_EDITOR' });
@@ -28,11 +44,21 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
   const handleApply = useCallback(() => {
     if (!editingTaskId) return;
 
+    const tags = tagsInput
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
     const updates: Record<string, unknown> = {
       name,
       duration,
       status,
       isCritical,
+      progress: Math.max(0, Math.min(100, progress)),
+      color: color.trim() || undefined,
+      tags: tags.length > 0 ? tags : undefined,
+      assignee: assignee.trim() || undefined,
+      description: description.trim() || undefined,
     };
 
     // If after is provided, use it and clear start
@@ -50,7 +76,21 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
 
     dispatch({ type: 'UPDATE_TASK', taskId: editingTaskId, updates });
     dispatch({ type: 'CLOSE_TASK_EDITOR' });
-  }, [editingTaskId, name, duration, status, isCritical, after, start, dispatch]);
+  }, [
+    editingTaskId,
+    name,
+    duration,
+    status,
+    isCritical,
+    after,
+    start,
+    progress,
+    color,
+    tagsInput,
+    assignee,
+    description,
+    dispatch,
+  ]);
 
   const handleDelete = useCallback(() => {
     if (!editingTaskId) return;
@@ -218,6 +258,100 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
               className="input-field"
               value={start}
               onChange={(e) => setStart(e.target.value)}
+            />
+          </div>
+
+          {/* Progress */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between" style={{ color: 'var(--text-secondary)' }}>
+              <span>Progress</span>
+              <span className="font-mono text-[10px]" style={{ color: 'var(--text-primary)' }}>{progress}%</span>
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={progress}
+              onChange={(e) => setProgress(parseInt(e.target.value) || 0)}
+              className="cursor-pointer"
+            />
+          </div>
+
+          {/* Color */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              Color override
+            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setColor('')}
+                className="text-[10px] font-semibold px-2 py-1 rounded cursor-pointer"
+                style={{
+                  background: color === '' ? 'var(--accent)' : 'var(--bg-card)',
+                  color: color === '' ? '#fff' : 'var(--text-secondary)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                Auto
+              </button>
+              {COLOR_SWATCHES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setColor(c)}
+                  title={c}
+                  className="w-6 h-6 rounded cursor-pointer"
+                  style={{
+                    background: c,
+                    outline: color === c ? '2px solid var(--text-primary)' : '1px solid var(--border-color)',
+                    outlineOffset: color === c ? 2 : 0,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Assignee */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              Assignee
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. Alice"
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+            />
+          </div>
+
+          {/* Tags */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              Tags (comma separated)
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g. frontend, blocked"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+            />
+          </div>
+
+          {/* Description */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              Description
+            </label>
+            <textarea
+              className="input-field"
+              rows={3}
+              placeholder="Free-form notes..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
             />
           </div>
         </div>

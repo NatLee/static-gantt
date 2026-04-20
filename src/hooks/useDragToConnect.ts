@@ -12,6 +12,8 @@ export interface PreviewLine {
   ey: number;
 }
 
+export type ConnectDirection = 'forward' | 'backward';
+
 interface UseDragToConnectArgs {
   tasks: Task[];
   taskMap: Map<string, ComputedTask>;
@@ -32,38 +34,46 @@ export function useDragToConnect({
   const [isConnecting, setIsConnecting] = useState(false);
   const [previewLine, setPreviewLine] = useState<PreviewLine | null>(null);
   const [hoveredTargetId, setHoveredTargetId] = useState<string | null>(null);
+  const [cycleBlocked, setCycleBlocked] = useState(false);
   const [rejectReason, setRejectReason] = useState<string | null>(null);
 
   const stateRef = useRef<{
     sourceId: string;
     sx: number;
     sy: number;
+    direction: ConnectDirection;
   } | null>(null);
 
   const hoveredRef = useRef<string | null>(null);
 
   const startConnect = useCallback(
-    (e: React.MouseEvent, sourceTaskId: string) => {
-      e.preventDefault();
-      e.stopPropagation();
-
+    (
+      sourceTaskId: string,
+      clientX: number,
+      clientY: number,
+      direction: ConnectDirection = 'forward'
+    ) => {
       const source = taskMap.get(sourceTaskId);
       const gridEl = gridRef.current;
       if (!source || source.rowIndex === undefined || !gridEl) return;
 
       const ppd = PIXELS_PER_DAY * zoomScale;
-      const sx = (source.endDayOffset - timelineStartDay) * ppd;
+      const sx =
+        direction === 'forward'
+          ? (source.endDayOffset - timelineStartDay) * ppd
+          : (source.startDayOffset - timelineStartDay) * ppd;
       const sy = source.rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
 
       const rect = gridEl.getBoundingClientRect();
-      const ex = e.clientX - rect.left;
-      const ey = e.clientY - rect.top;
+      const ex = clientX - rect.left;
+      const ey = clientY - rect.top;
 
-      stateRef.current = { sourceId: sourceTaskId, sx, sy };
+      stateRef.current = { sourceId: sourceTaskId, sx, sy, direction };
       hoveredRef.current = null;
       setIsConnecting(true);
       setPreviewLine({ sx, sy, ex, ey });
       setHoveredTargetId(null);
+      setCycleBlocked(false);
       setRejectReason(null);
     },
     [taskMap, zoomScale, timelineStartDay, gridRef]
@@ -87,8 +97,18 @@ export function useDragToConnect({
       const barEl = el?.closest('[data-task-id]') as HTMLElement | null;
       const targetId = barEl?.dataset.taskId ?? null;
       if (targetId !== hoveredRef.current) {
-        hoveredRef.current = targetId && targetId !== st.sourceId ? targetId : null;
-        setHoveredTargetId(hoveredRef.current);
+        const validTarget = targetId && targetId !== st.sourceId ? targetId : null;
+        hoveredRef.current = validTarget;
+        setHoveredTargetId(validTarget);
+        if (validTarget) {
+          const [pred, succ] =
+            st.direction === 'forward'
+              ? [st.sourceId, validTarget]
+              : [validTarget, st.sourceId];
+          setCycleBlocked(wouldCreateCycle(tasks, pred, succ));
+        } else {
+          setCycleBlocked(false);
+        }
       }
     };
 
@@ -100,17 +120,21 @@ export function useDragToConnect({
       setIsConnecting(false);
       setPreviewLine(null);
       setHoveredTargetId(null);
+      setCycleBlocked(false);
 
       if (!st || !target) return;
       if (target === st.sourceId) return;
 
-      if (wouldCreateCycle(tasks, st.sourceId, target)) {
+      const [pred, succ] =
+        st.direction === 'forward' ? [st.sourceId, target] : [target, st.sourceId];
+
+      if (wouldCreateCycle(tasks, pred, succ)) {
         setRejectReason('cycle');
         setTimeout(() => setRejectReason(null), 2000);
         return;
       }
 
-      dispatch({ type: 'ADD_TASK_DEPENDENCY', taskId: target, predecessorId: st.sourceId });
+      dispatch({ type: 'ADD_TASK_DEPENDENCY', taskId: succ, predecessorId: pred });
     };
 
     document.addEventListener('mousemove', handleMove);
@@ -121,5 +145,5 @@ export function useDragToConnect({
     };
   }, [isConnecting, tasks, dispatch, gridRef]);
 
-  return { startConnect, isConnecting, previewLine, hoveredTargetId, rejectReason };
+  return { startConnect, isConnecting, previewLine, hoveredTargetId, cycleBlocked, rejectReason };
 }

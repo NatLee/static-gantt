@@ -304,6 +304,9 @@ export default function GanttPanel({
               totalRows={totalRows}
               totalWidth={totalWidth}
               totalHeight={totalHeight}
+              timelineStartDay={state.timelineStartDay}
+              timelineEndDay={state.timelineEndDay}
+              ppd={ppd}
             />
             <div
               ref={datePointerRef}
@@ -340,7 +343,6 @@ export default function GanttPanel({
             />
             <DependencyLines
               computed={computedWithRows}
-              taskMap={taskMap}
               zoomScale={state.zoomScale}
               timelineStartDay={state.timelineStartDay}
               totalWidth={totalWidth}
@@ -363,6 +365,7 @@ export default function GanttPanel({
               onStartConnect={connect.startConnect}
               hoveredTargetId={connect.hoveredTargetId}
               isConnecting={connect.isConnecting}
+              connectCycleBlocked={connect.cycleBlocked}
             />
             {connect.previewLine && (
               <svg
@@ -384,12 +387,18 @@ export default function GanttPanel({
                     connect.previewLine.ey
                   )}
                   fill="none"
-                  stroke="var(--accent)"
+                  stroke={connect.cycleBlocked ? '#ef4444' : 'var(--accent)'}
                   strokeWidth={2}
                   strokeDasharray="5 3"
                 />
                 {buildArrowHead(connect.previewLine.ex, connect.previewLine.ey).map((ad, j) => (
-                  <path key={j} d={ad} fill="none" stroke="var(--accent)" strokeWidth={2} />
+                  <path
+                    key={j}
+                    d={ad}
+                    fill="none"
+                    stroke={connect.cycleBlocked ? '#ef4444' : 'var(--accent)'}
+                    strokeWidth={2}
+                  />
                 ))}
               </svg>
             )}

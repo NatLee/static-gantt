@@ -6,7 +6,7 @@ const MS_PER_DAY = 86400000;
 export function computeSchedule(tasks: Task[]): ComputedTask[] {
   const taskMap: Record<string, ComputedTask> = {};
   tasks.forEach(t => {
-    taskMap[t.id] = { ...t, startDayOffset: -1, endDayOffset: -1 };
+    taskMap[t.id] = { ...t, startDayOffset: NaN, endDayOffset: NaN };
   });
 
   let done = false;
@@ -15,7 +15,7 @@ export function computeSchedule(tasks: Task[]): ComputedTask[] {
     done = true;
     for (const id in taskMap) {
       const t = taskMap[id];
-      if (t.startDayOffset >= 0) continue;
+      if (!Number.isNaN(t.startDayOffset)) continue;
 
       if (t.start) {
         t.startDayOffset = Math.round(
@@ -24,18 +24,18 @@ export function computeSchedule(tasks: Task[]): ComputedTask[] {
         t.endDayOffset = t.startDayOffset + t.duration;
       } else if (t.after) {
         const pres = t.after.split(',').map(s => s.trim());
-        let mx = -1;
+        let mx = -Infinity;
         let ok = true;
         for (const pid of pres) {
           const p = taskMap[pid];
-          if (p && p.endDayOffset >= 0) {
+          if (p && !Number.isNaN(p.endDayOffset)) {
             mx = Math.max(mx, p.endDayOffset);
           } else {
             ok = false;
             break;
           }
         }
-        if (ok && mx >= 0) {
+        if (ok && isFinite(mx)) {
           t.startDayOffset = mx;
           t.endDayOffset = t.startDayOffset + t.duration;
         } else {
@@ -71,8 +71,8 @@ export function computeTimelineBounds(
   let maxEnd = -Infinity;
 
   computed.forEach(t => {
-    if (t.startDayOffset >= 0) minStart = Math.min(minStart, t.startDayOffset);
-    if (t.endDayOffset >= 0) maxEnd = Math.max(maxEnd, t.endDayOffset);
+    if (!Number.isNaN(t.startDayOffset)) minStart = Math.min(minStart, t.startDayOffset);
+    if (!Number.isNaN(t.endDayOffset)) maxEnd = Math.max(maxEnd, t.endDayOffset);
   });
 
   milestones.forEach(ms => {

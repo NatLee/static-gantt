@@ -8,7 +8,6 @@ import { buildDepPath, buildArrowHead } from '@/lib/depPath';
 
 interface DependencyLinesProps {
   computed: ComputedTask[];
-  taskMap: Map<string, ComputedTask>;
   zoomScale: number;
   timelineStartDay: number;
   totalWidth: number;
@@ -18,7 +17,6 @@ interface DependencyLinesProps {
 
 export default function DependencyLines({
   computed,
-  taskMap,
   zoomScale,
   timelineStartDay,
   totalWidth,
@@ -29,16 +27,18 @@ export default function DependencyLines({
 
   const paths = useMemo(() => {
     const result: { d: string; isCritical: boolean; arrows: string[] }[] = [];
+    const lookup = new Map<string, ComputedTask>();
+    computed.forEach((t) => lookup.set(t.id, t));
 
     computed.forEach((task) => {
-      if (!task.after || task.rowIndex === undefined || task.startDayOffset < 0) return;
+      if (!task.after || task.rowIndex === undefined || Number.isNaN(task.startDayOffset)) return;
 
       const taskRowIndex = task.rowIndex;
       const pres = task.after.split(',').map((s) => s.trim());
 
       pres.forEach((preId) => {
-        const pre = taskMap.get(preId);
-        if (!pre || pre.rowIndex === undefined || pre.startDayOffset < 0) return;
+        const pre = lookup.get(preId);
+        if (!pre || pre.rowIndex === undefined || Number.isNaN(pre.startDayOffset)) return;
 
         if (virtualWindow.enabled) {
           const minRow = Math.min(pre.rowIndex, taskRowIndex);
@@ -63,7 +63,7 @@ export default function DependencyLines({
     });
 
     return result;
-  }, [computed, taskMap, ppd, timelineStartDay, virtualWindow]);
+  }, [computed, ppd, timelineStartDay, virtualWindow]);
 
   return (
     <svg

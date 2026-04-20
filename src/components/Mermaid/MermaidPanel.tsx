@@ -11,11 +11,21 @@ import {
 } from 'react';
 import { GanttState } from '@/types';
 import { generateMermaidFromData } from '@/lib/mermaidGenerator';
+import { formatMermaid } from '@/lib/mermaidFormat';
 import CodeMirror from '@uiw/react-codemirror';
-import { markdown } from '@codemirror/lang-markdown';
+import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
+import { mermaidLanguage } from '@/lib/codemirror/mermaidLang';
 
 export interface MermaidPanelHandle {
   getCode: () => string;
+  insertSection: () => void;
+  insertTask: () => void;
+  insertMilestone: () => void;
+  format: () => void;
+  downloadMmd: () => void;
+  importMmd: (text: string) => void;
+  exportSvg: () => void;
+  exportPng: () => void;
 }
 
 interface MermaidPanelProps {
@@ -40,19 +50,39 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
     const previewRef = useRef<HTMLDivElement>(null);
     const svgContainerRef = useRef<HTMLDivElement>(null);
     const renderIdRef = useRef(0);
+    const editorRef = useRef<ReactCodeMirrorRef>(null);
+    const prevModeRef = useRef(state.currentMode);
 
-    // Expose getCode to parent via ref
-    useImperativeHandle(ref, () => ({
-      getCode: () => codeRef.current,
-    }), []);
+    // Imperative API exposed to parent (GanttApp) so the global Header toolbar
+    // can drive editor actions without duplicating state. `apiRef` is mutated
+    // during render once handlers are defined below; the stable handle returned
+    // by useImperativeHandle proxies through to the latest ref contents.
+    const apiRef = useRef<Partial<MermaidPanelHandle>>({});
+    useImperativeHandle(
+      ref,
+      () => ({
+        getCode: () => codeRef.current,
+        insertSection: () => apiRef.current.insertSection?.(),
+        insertTask: () => apiRef.current.insertTask?.(),
+        insertMilestone: () => apiRef.current.insertMilestone?.(),
+        format: () => apiRef.current.format?.(),
+        downloadMmd: () => apiRef.current.downloadMmd?.(),
+        importMmd: (text: string) => apiRef.current.importMmd?.(text),
+        exportSvg: () => apiRef.current.exportSvg?.(),
+        exportPng: () => apiRef.current.exportPng?.(),
+      }),
+      []
+    );
 
-    // Regenerate code when mode switches TO mermaid
+    // Regenerate code only when mode switches FROM visual TO mermaid.
+    // Staying in mermaid mode must not overwrite user edits even if tasks change.
     useEffect(() => {
-      if (state.currentMode === 'mermaid') {
+      if (prevModeRef.current !== 'mermaid' && state.currentMode === 'mermaid') {
         const newCode = generateMermaidFromData(state.tasks);
         setCode(newCode);
         codeRef.current = newCode;
       }
+      prevModeRef.current = state.currentMode;
     }, [state.currentMode, state.tasks]);
 
     // Render mermaid diagram
@@ -235,7 +265,156 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
       img.src = url;
     }, [svgContent]);
 
-    const extensions = useMemo(() => [markdown()], []);
+    const extensions = useMemo(() => [mermaidLanguage], []);
+
+    // --- Toolbar: insert templates at cursor ---
+    const insertAtCursor = useCallback(
+      (snippet: string, cursorDelta?: number) => {
+        const view = editorRef.current?.view;
+        if (!view) return;
+        const sel = view.state.selection.main;
+        const line = view.state.doc.lineAt(sel.from);
+        // Insert on its own line: ensure we start at line end (append new line) unless line is empty
+        const atEmptyLine = line.text.trim().length === 0;
+        const insertPos = atEmptyLine ? line.from : line.to;
+        const prefix = atEmptyLine ? '' : '\n';
+        const text = prefix + snippet;
+        const newCursor =
+          cursorDelta !== undefined
+            ? insertPos + prefix.length + cursorDelta
+            : insertPos + text.length;
+        view.dispatch({
+          changes: { from: insertPos, insert: text },
+          selection: { anchor: newCursor, head: newCursor },
+        });
+        view.focus();
+      },
+      []
+    );
+
+    const handleInsertSection = useCallback(() => {
+      // Cursor lands on the placeholder text for quick rename
+      const placeholder = 'New Section';
+      const snippet = `    section ${placeholder}`;
+      insertAtCursor(snippet, snippet.length - placeholder.length);
+      // Select the placeholder text
+      requestAnimationFrame(() => {
+        const view = editorRef.current?.view;
+        if (!view) return;
+        const sel = view.state.selection.main;
+        view.dispatch({
+          selection: {
+            anchor: sel.head - placeholder.length,
+            head: sel.head,
+          },
+        });
+      });
+    }, [insertAtCursor]);
+
+    const handleInsertTask = useCallback(() => {
+      const id = `t${Date.now().toString(36).slice(-4)}`;
+      const today = new Date().toISOString().slice(0, 10);
+      const name = 'New Task';
+      const snippet = `    ${name.padEnd(40, ' ')}:${id}, ${today}, 5d`;
+      insertAtCursor(snippet);
+      requestAnimationFrame(() => {
+        const view = editorRef.current?.view;
+        if (!view) return;
+        const sel = view.state.selection.main;
+        // Select the "New Task" portion (between the leading 4 spaces and the padding)
+        const line = view.state.doc.lineAt(sel.head);
+        const nameStart = line.from + 4;
+        view.dispatch({
+          selection: { anchor: nameStart, head: nameStart + name.length },
+        });
+      });
+    }, [insertAtCursor]);
+
+    const handleInsertMilestone = useCallback(() => {
+      const id = `m${Date.now().toString(36).slice(-4)}`;
+      const today = new Date().toISOString().slice(0, 10);
+      const name = 'New Milestone';
+      const snippet = `    ${name.padEnd(40, ' ')}:milestone, ${id}, ${today}, 0d`;
+      insertAtCursor(snippet);
+      requestAnimationFrame(() => {
+        const view = editorRef.current?.view;
+        if (!view) return;
+        const sel = view.state.selection.main;
+        const line = view.state.doc.lineAt(sel.head);
+        const nameStart = line.from + 4;
+        view.dispatch({
+          selection: { anchor: nameStart, head: nameStart + name.length },
+        });
+      });
+    }, [insertAtCursor]);
+
+    const handleFormat = useCallback(() => {
+      const formatted = formatMermaid(codeRef.current);
+      if (formatted === codeRef.current) return;
+      setCode(formatted);
+      codeRef.current = formatted;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => renderMermaid(formatted), 200);
+    }, [renderMermaid]);
+
+    const handleDownloadMmd = useCallback(() => {
+      const blob = new Blob([codeRef.current], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'gantt-chart.mmd';
+      a.click();
+      URL.revokeObjectURL(url);
+    }, []);
+
+    const handleImportMmd = useCallback(
+      (text: string) => {
+        setCode(text);
+        codeRef.current = text;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => renderMermaid(text), 200);
+      },
+      [renderMermaid]
+    );
+
+    // Keep the imperative API pointed at the latest handler closures.
+    apiRef.current = {
+      insertSection: handleInsertSection,
+      insertTask: handleInsertTask,
+      insertMilestone: handleInsertMilestone,
+      format: handleFormat,
+      downloadMmd: handleDownloadMmd,
+      importMmd: handleImportMmd,
+      exportSvg: handleExportSVG,
+      exportPng: handleExportPNG,
+    };
+
+    // Mermaid-specific shortcuts (editor-scoped)
+    useEffect(() => {
+      const view = editorRef.current?.view;
+      const dom = view?.dom;
+      if (!dom) return;
+      const onKey = (e: KeyboardEvent) => {
+        const cmd = e.metaKey || e.ctrlKey;
+        if (!cmd || !e.shiftKey) return;
+        const key = e.key.toLowerCase();
+        if (key === 's') {
+          e.preventDefault();
+          handleInsertSection();
+        } else if (key === 't') {
+          e.preventDefault();
+          handleInsertTask();
+        } else if (key === 'm') {
+          e.preventDefault();
+          handleInsertMilestone();
+        } else if (key === 'f') {
+          e.preventDefault();
+          handleFormat();
+        }
+      };
+      dom.addEventListener('keydown', onKey);
+      return () => dom.removeEventListener('keydown', onKey);
+    }, [handleInsertSection, handleInsertTask, handleInsertMilestone, handleFormat]);
 
     return (
       <div
@@ -250,49 +429,22 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
         >
           {/* Editor Header */}
           <div
-            className="flex items-center justify-between px-4 py-2 border-b shrink-0"
+            className="flex items-center gap-2 px-4 py-2 border-b shrink-0"
             style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}
           >
-            <div className="flex items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-secondary)' }}>
-                <polyline points="16 18 22 12 16 6" />
-                <polyline points="8 6 2 12 8 18" />
-              </svg>
-              <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Mermaid Editor
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                className="btn-glass text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer flex items-center gap-1"
-                onClick={handleExportSVG}
-                title="Export SVG"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                SVG
-              </button>
-              <button
-                className="btn-glass text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer flex items-center gap-1"
-                onClick={handleExportPNG}
-                title="Export PNG"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                PNG
-              </button>
-            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-secondary)' }}>
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Mermaid Editor
+            </span>
           </div>
 
           {/* CodeMirror */}
           <div className="flex-1 overflow-auto">
             <CodeMirror
+              ref={editorRef}
               value={code}
               onChange={handleCodeChange}
               extensions={extensions}
