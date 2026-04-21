@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { GanttState, GanttAction, HierarchyMap } from '@/types';
 import { ROW_HEIGHT } from '@/lib/ganttLayout';
+import { createAutoScroll, computeEdgeScrollSpeed } from '@/lib/autoScroll';
 
 export type RowItemType = 'phase' | 'sub-phase' | 'task';
 
@@ -78,23 +79,7 @@ export function useDragReorder(
     grabOffsetY: number;
   } | null>(null);
 
-  const autoScrollRef = useRef<number | null>(null);
-
-  const startAutoScroll = useCallback((el: HTMLElement, speed: number) => {
-    if (autoScrollRef.current !== null) return;
-    const scroll = () => {
-      el.scrollTop += speed;
-      autoScrollRef.current = requestAnimationFrame(scroll);
-    };
-    autoScrollRef.current = requestAnimationFrame(scroll);
-  }, []);
-
-  const stopAutoScroll = useCallback(() => {
-    if (autoScrollRef.current !== null) {
-      cancelAnimationFrame(autoScrollRef.current);
-      autoScrollRef.current = null;
-    }
-  }, []);
+  const autoScrollRef = useRef(createAutoScroll());
 
   const startDrag = useCallback(
     (e: React.MouseEvent, type: RowItemType, source: DragSource, rowEl: HTMLElement) => {
@@ -201,14 +186,9 @@ export function useDragReorder(
 
       // Auto-scroll
       const containerRect = scrollEl.getBoundingClientRect();
-      const edgeThreshold = 60;
-      if (e.clientY < containerRect.top + edgeThreshold) {
-        startAutoScroll(scrollEl, -5);
-      } else if (e.clientY > containerRect.bottom - edgeThreshold) {
-        startAutoScroll(scrollEl, 5);
-      } else {
-        stopAutoScroll();
-      }
+      const speed = computeEdgeScrollSpeed(e.clientY, containerRect);
+      if (speed === 0) autoScrollRef.current.stop();
+      else autoScrollRef.current.update(scrollEl, speed);
     };
 
     const handleMouseUp = () => {
@@ -220,7 +200,7 @@ export function useDragReorder(
         ds.ghostEl.parentNode.removeChild(ds.ghostEl);
       }
 
-      stopAutoScroll();
+      autoScrollRef.current.stop();
 
       const rowMap = ds.rowMap;
       const indicatorRow = dropIndicatorRowRef.current;
@@ -249,7 +229,7 @@ export function useDragReorder(
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, hierarchy, dispatch, scrollContainerRef, startAutoScroll, stopAutoScroll]);
+  }, [isDragging, hierarchy, dispatch, scrollContainerRef]);
 
   return { startDrag, isDragging, dragSource, dropIndicatorRow };
 }
@@ -352,7 +332,7 @@ function findSubPhaseDropRow(
   return dropRow;
 }
 
-function findTaskDropRow(
+export function findTaskDropRow(
   hoveredRow: number,
   relativeY: number,
   rowMap: RowItem[],
@@ -492,16 +472,22 @@ function dispatchSubPhaseReorder(
   }
 }
 
-function dispatchTaskReorder(
+/**
+ * Given a source task drag and a target drop-row index into rowMap, resolve
+ * the final `{ targetPhase, insertBeforeTaskId }` for MOVE_REORDER_TASK /
+ * MOVE_TASK_WITH_REORDER. Shared by left-panel list drag and right-side bar
+ * drag so both paths behave identically.
+ *
+ * Leaves `insertBeforeTaskId` undefined to signal "append to target phase"
+ * (the reducer handles that by inserting after the last task in targetPhase).
+ */
+export function resolveTaskDropTarget(
   source: DragSource,
   dropRow: number,
   rowMap: RowItem[],
-  hierarchy: HierarchyMap,
-  dispatch: React.Dispatch<GanttAction>,
-) {
-  if (!source.taskId || !source.subPhase) return;
+): { targetPhase: string; insertBeforeTaskId?: string } | null {
+  if (!source.taskId) return null;
 
-  // Determine target phase and insertion point
   let targetMaster: string | null = null;
   let targetSub: string | null = null;
   let insertBeforeTaskId: string | undefined;
@@ -513,12 +499,8 @@ function dispatchTaskReorder(
     if (item.type === 'task' && item.taskId !== source.taskId) {
       insertBeforeTaskId = item.taskId;
     }
-    // If landing on a sub-phase or phase header, find the sub-phase
-    if (!targetSub && item.type === 'sub-phase') {
-      targetSub = item.subPhase ?? null;
-    }
     if (!targetSub) {
-      // Walk forward to find the first sub-phase
+      // Landing on a phase header — walk forward to find the first sub-phase
       for (let i = dropRow; i < rowMap.length; i++) {
         if (rowMap[i].subPhase && rowMap[i].masterPhase === targetMaster) {
           targetSub = rowMap[i].subPhase!;
@@ -527,7 +509,7 @@ function dispatchTaskReorder(
       }
     }
   } else {
-    // End of list — find last sub-phase
+    // dropRow === rowMap.length → append semantics; don't set insertBeforeTaskId.
     const lastItem = rowMap[rowMap.length - 1];
     if (lastItem) {
       targetMaster = lastItem.masterPhase;
@@ -535,13 +517,24 @@ function dispatchTaskReorder(
     }
   }
 
-  if (!targetMaster || !targetSub) return;
+  if (!targetMaster || !targetSub) return null;
+  return { targetPhase: `${targetMaster} ${targetSub}`, insertBeforeTaskId };
+}
 
-  const targetPhase = `${targetMaster} ${targetSub}`;
+function dispatchTaskReorder(
+  source: DragSource,
+  dropRow: number,
+  rowMap: RowItem[],
+  hierarchy: HierarchyMap,
+  dispatch: React.Dispatch<GanttAction>,
+) {
+  if (!source.taskId || !source.subPhase) return;
+  const resolved = resolveTaskDropTarget(source, dropRow, rowMap);
+  if (!resolved) return;
   dispatch({
     type: 'MOVE_REORDER_TASK',
     taskId: source.taskId,
-    targetPhase,
-    insertBeforeTaskId,
+    targetPhase: resolved.targetPhase,
+    insertBeforeTaskId: resolved.insertBeforeTaskId,
   });
 }

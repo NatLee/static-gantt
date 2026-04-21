@@ -9,6 +9,10 @@ import TaskEditorPanel from '@/components/Editor/TaskEditorPanel';
 import AddDialog from '@/components/Dialogs/AddDialog';
 import ProjectListDialog from '@/components/Dialogs/ProjectListDialog';
 import ShortcutsDialog from '@/components/Dialogs/ShortcutsDialog';
+import WelcomeDialog from '@/components/Dialogs/WelcomeDialog';
+import EmptyState from '@/components/Gantt/EmptyState';
+import { RowHoverProvider } from '@/hooks/useRowHover';
+import { defaultTasks } from '@/data/defaultProject';
 import SearchPanel from '@/components/Gantt/SearchPanel';
 import { parseMermaidToTasks } from '@/lib/mermaidParser';
 import { dateToOffset } from '@/lib/dateUtils';
@@ -47,10 +51,35 @@ export default function GanttApp() {
   const [projectListOpen, setProjectListOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', state.isDark ? 'dark' : 'light');
   }, [state.isDark]);
+
+  // First-visit welcome: flag stored once-ever, never shown again after dismiss
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('gantt-welcome-seen')) {
+        setWelcomeOpen(true);
+      }
+    } catch {
+      // localStorage unavailable, skip
+    }
+  }, []);
+
+  const handleCloseWelcome = useCallback(() => {
+    try {
+      localStorage.setItem('gantt-welcome-seen', '1');
+    } catch {
+      // ignore
+    }
+    setWelcomeOpen(false);
+  }, []);
+
+  const handleLoadSample = useCallback(() => {
+    dispatch({ type: 'REPLACE_ALL_TASKS', tasks: defaultTasks });
+  }, [dispatch]);
 
   // When switching from mermaid back to visual, parse the code and replace tasks
   useEffect(() => {
@@ -208,13 +237,19 @@ export default function GanttApp() {
       />
 
       {state.currentMode === 'visual' ? (
-        <GanttPanel
-          state={state}
-          dispatch={dispatch}
-          computed={computed}
-          hierarchy={hierarchy}
-          taskMap={taskMap}
-        />
+        state.tasks.length === 0 ? (
+          <EmptyState dispatch={dispatch} onLoadDefault={handleLoadSample} />
+        ) : (
+          <RowHoverProvider>
+            <GanttPanel
+              state={state}
+              dispatch={dispatch}
+              computed={computed}
+              hierarchy={hierarchy}
+              taskMap={taskMap}
+            />
+          </RowHoverProvider>
+        )
       ) : (
         <MermaidPanel
           ref={mermaidRef}
@@ -245,6 +280,13 @@ export default function GanttApp() {
       )}
 
       {shortcutsOpen && <ShortcutsDialog onClose={handleCloseShortcuts} />}
+
+      {welcomeOpen && (
+        <WelcomeDialog
+          onClose={handleCloseWelcome}
+          onOpenShortcuts={handleOpenShortcuts}
+        />
+      )}
 
       {searchOpen && state.currentMode === 'visual' && (
         <SearchPanel

@@ -5,12 +5,16 @@ import { ComputedTask, GanttState, GanttAction, HierarchyMap } from '@/types';
 import { offsetToDate, formatDate, formatISO } from '@/lib/dateUtils';
 import { PIXELS_PER_DAY, ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
-import { buildRowMap } from '@/hooks/useDragReorder';
+import { buildRowMap, findTaskDropRow, resolveTaskDropTarget, type RowItem } from '@/hooks/useDragReorder';
 import type { ConnectDirection } from '@/hooks/useDragToConnect';
+import { useRowHover } from '@/hooks/useRowHover';
+import { updateDepsForTask } from '@/lib/depLineLive';
+import { createAutoScroll, computeEdgeScrollSpeed } from '@/lib/autoScroll';
 import TaskContextMenu from './TaskContextMenu';
 import TaskTooltip from './TaskTooltip';
+import AssigneeAvatar from './AssigneeAvatar';
 
-const CONNECT_DRAG_THRESHOLD = 4;
+const BAR_CLICK_THRESHOLD = 4;
 
 interface TaskBarContainerProps {
   computed: ComputedTask[];
@@ -18,6 +22,7 @@ interface TaskBarContainerProps {
   dispatch: React.Dispatch<GanttAction>;
   virtualWindow: VirtualWindow;
   hierarchy: HierarchyMap;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
   onStartConnect: (
     sourceTaskId: string,
     clientX: number,
@@ -41,6 +46,7 @@ export default function TaskBarContainer({
   dispatch,
   virtualWindow,
   hierarchy,
+  scrollContainerRef,
   onStartConnect,
   hoveredTargetId,
   isConnecting,
@@ -48,6 +54,7 @@ export default function TaskBarContainer({
 }: TaskBarContainerProps) {
   const ppd = PIXELS_PER_DAY * state.zoomScale;
   const { timelineStartDay } = state;
+  const { setHover } = useRowHover();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const barRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -56,6 +63,9 @@ export default function TaskBarContainer({
   const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const floatingPillRef = useRef<HTMLDivElement>(null);
+  const snapGuideRef = useRef<HTMLDivElement>(null);
+  const didDragBarRef = useRef(false);
+  const autoScrollRef = useRef(createAutoScroll());
   const dragState = useRef<{
     type: 'move' | 'resize';
     taskId: string;
@@ -67,7 +77,15 @@ export default function TaskBarContainer({
     origStartDayOffset: number;
     origDuration: number;
     origRowIndex: number;
-    lastDropRow: number | null;
+    origListTop: number;
+    origPhase: string;
+    sourceMaster: string;
+    sourceSub: string | undefined;
+    listRowEl: HTMLElement | null;
+    dropIndicatorEl: HTMLElement | null;
+    rowMap: RowItem[];
+    depSvg: SVGSVGElement | null;
+    dropRow: number | null;
   } | null>(null);
 
   const handleConnectMouseDown = useCallback(
@@ -78,44 +96,13 @@ export default function TaskBarContainer({
     ) => {
       e.preventDefault();
       e.stopPropagation();
-
-      const startX = e.clientX;
-      const startY = e.clientY;
-      let dragStarted = false;
-
-      const onMove = (ev: MouseEvent) => {
-        if (dragStarted) return;
-        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > CONNECT_DRAG_THRESHOLD) {
-          dragStarted = true;
-          document.removeEventListener('mousemove', onMove);
-          document.removeEventListener('mouseup', onUp);
-          onStartConnect(task.id, ev.clientX, ev.clientY, direction);
-        }
-      };
-
-      const onUp = () => {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-        if (!dragStarted) {
-          dispatch({
-            type: 'OPEN_DIALOG',
-            dialog: {
-              type: direction === 'forward' ? 'add-after-task' : 'add-before-task',
-              context: { targetTaskId: task.id, phase: task.phase },
-            },
-          });
-        }
-      };
-
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
+      onStartConnect(task.id, e.clientX, e.clientY, direction);
     },
-    [dispatch, onStartConnect]
+    [onStartConnect]
   );
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, task: ComputedTask, type: 'move' | 'resize') => {
-      if (type === 'move' && !task.start) return;
       if (task.rowIndex === undefined) return;
       e.preventDefault();
       e.stopPropagation();
@@ -131,6 +118,33 @@ export default function TaskBarContainer({
       const origTop = parseFloat(rowEl.style.top) || 0;
       const origWidth = barEl.offsetWidth;
 
+      // Find left task-list row for parallel vertical movement
+      const listRowEl =
+        (document.querySelector(
+          `.sticky-col [data-task-row-id="${task.id}"]`,
+        ) as HTMLElement | null) ?? null;
+      const origListTop = listRowEl ? parseFloat(listRowEl.style.top) || 0 : 0;
+
+      // Drop indicator (lives inside TaskListColumn as a persistent hidden div)
+      const dropIndicatorEl =
+        (document.querySelector('.bar-drag-drop-indicator') as HTMLElement | null) ?? null;
+
+      // Row map for unified drop-target resolution
+      const rowMap = buildRowMap(
+        hierarchy,
+        state.currentFilter,
+        state.collapsedPhases,
+        state.collapsedSubPhases,
+      );
+
+      const depSvg =
+        (document.querySelector('svg[data-role="dep-svg"]') as SVGSVGElement | null) ?? null;
+
+      const phaseMatch = task.phase.match(/^(Phase \d+)\s+(.*)/);
+      const sourceMaster = phaseMatch?.[1] ?? '';
+      const sourceSub = phaseMatch?.[2];
+
+      didDragBarRef.current = false;
       dragState.current = {
         type,
         taskId: task.id,
@@ -142,33 +156,103 @@ export default function TaskBarContainer({
         origStartDayOffset: task.startDayOffset,
         origDuration: task.duration,
         origRowIndex: task.rowIndex,
-        lastDropRow: null,
+        origListTop,
+        origPhase: task.phase,
+        sourceMaster,
+        sourceSub,
+        listRowEl,
+        dropIndicatorEl,
+        rowMap,
+        depSvg,
+        dropRow: null,
       };
 
       if (type === 'move') {
         barEl.classList.add('dragging');
+        if (listRowEl) listRowEl.classList.add('dragging');
       }
 
       const pill = floatingPillRef.current;
       if (pill) pill.style.display = 'block';
+      const snapGuide = snapGuideRef.current;
+      if (snapGuide && type === 'move') snapGuide.style.display = 'block';
 
       const handleMouseMove = (ev: MouseEvent) => {
         const ds = dragState.current;
         if (!ds) return;
         const dx = ev.clientX - ds.startX;
         const dy = ev.clientY - ds.startY;
+        if (!didDragBarRef.current && Math.hypot(dx, dy) > BAR_CLICK_THRESHOLD) {
+          didDragBarRef.current = true;
+        }
 
         if (ds.type === 'move') {
+          const dayDelta = Math.round(dx / ppd);
+          const snappedDx = dayDelta * ppd;
+
+          // Move right-side bar wrapper (horizontal snapped, vertical raw for smoothness)
           const wrapper = barRefs.current[ds.taskId]?.parentElement;
-          if (wrapper) {
-            wrapper.style.left = `${ds.origLeft + dx}px`;
-          }
+          if (wrapper) wrapper.style.left = `${ds.origLeft + snappedDx}px`;
           const row = rowRefs.current[ds.taskId];
-          if (row) {
-            row.style.top = `${ds.origTop + dy}px`;
+          if (row) row.style.top = `${ds.origTop + dy}px`;
+
+          // Move left-side task list row in parallel
+          if (ds.listRowEl) ds.listRowEl.style.top = `${ds.origListTop + dy}px`;
+
+          // Live-update dependency lines
+          updateDepsForTask(ds.depSvg, ds.taskId, snappedDx, dy, 0);
+
+          // Compute drop row using the same routine as useDragReorder
+          const scrollEl = scrollContainerRef.current;
+          let dropRow: number | null = null;
+          if (scrollEl) {
+            const listColEl = scrollEl.querySelector('.sticky-col');
+            const listAreaEl = listColEl?.children[1] as HTMLElement | undefined;
+            if (listAreaEl) {
+              const listRect = listAreaEl.getBoundingClientRect();
+              const relativeY = ev.clientY - listRect.top;
+              const hoveredRow = Math.floor(relativeY / ROW_HEIGHT);
+              if (hoveredRow >= 0 && ds.rowMap.length > 0) {
+                // Clamp so dragging past the last row still yields a valid
+                // findTaskDropRow hit; the helper can then return rowMap.length
+                // for "append at end" semantics.
+                const hr = Math.min(hoveredRow, ds.rowMap.length - 1);
+                dropRow = findTaskDropRow(hr, relativeY, ds.rowMap, {
+                  type: 'task',
+                  masterPhase: ds.sourceMaster,
+                  subPhase: ds.sourceSub,
+                  taskId: ds.taskId,
+                });
+              }
+            }
           }
+          ds.dropRow = dropRow;
+
+          // Update drop indicator
+          if (ds.dropIndicatorEl) {
+            if (dropRow !== null) {
+              ds.dropIndicatorEl.style.display = 'block';
+              ds.dropIndicatorEl.style.top = `${dropRow * ROW_HEIGHT - 1}px`;
+            } else {
+              ds.dropIndicatorEl.style.display = 'none';
+            }
+          }
+
+          // Auto-scroll at viewport edges
+          if (scrollEl) {
+            const rect = scrollEl.getBoundingClientRect();
+            const speed = computeEdgeScrollSpeed(ev.clientY, rect);
+            if (speed === 0) autoScrollRef.current.stop();
+            else autoScrollRef.current.update(scrollEl, speed);
+          }
+
+          // Snap guide
+          if (snapGuide) {
+            snapGuide.style.left = `${ds.origLeft + snappedDx}px`;
+            snapGuide.style.top = '0';
+          }
+
           if (pill) {
-            const dayDelta = Math.round(dx / ppd);
             const newStart = offsetToDate(ds.origStartDayOffset + dayDelta);
             const newEnd = offsetToDate(ds.origStartDayOffset + dayDelta + ds.origDuration - 1);
             pill.textContent = `${formatDate(newStart)} → ${formatDate(newEnd)}`;
@@ -176,14 +260,16 @@ export default function TaskBarContainer({
             pill.style.top = `${ev.clientY - 28}px`;
           }
         } else {
+          // Resize: only width changes; dep lines whose pred is this task shift sx.
           const bar = barRefs.current[ds.taskId];
-          if (bar) {
-            const newWidth = Math.max(12, ds.origWidth + dx);
-            bar.style.width = `${newWidth}px`;
-          }
+          const dayDelta = Math.round(dx / ppd);
+          const newDuration = Math.max(1, ds.origDuration + dayDelta);
+          const newWidth = Math.max(12, newDuration * ppd);
+          const widthDelta = newWidth - ds.origWidth;
+          if (bar) bar.style.width = `${newWidth}px`;
+          updateDepsForTask(ds.depSvg, ds.taskId, 0, 0, widthDelta);
+
           if (pill) {
-            const dayDelta = Math.round(dx / ppd);
-            const newDuration = Math.max(1, ds.origDuration + dayDelta);
             pill.textContent = `${newDuration}d`;
             pill.style.left = `${ev.clientX + 12}px`;
             pill.style.top = `${ev.clientY - 28}px`;
@@ -196,19 +282,20 @@ export default function TaskBarContainer({
         document.removeEventListener('mouseup', handleMouseUp);
 
         if (pill) pill.style.display = 'none';
+        if (snapGuide) snapGuide.style.display = 'none';
+        autoScrollRef.current.stop();
 
         const ds = dragState.current;
         if (!ds) return;
         dragState.current = null;
 
         const dx = ev.clientX - ds.startX;
-        const dy = ev.clientY - ds.startY;
         const dayDelta = Math.round(dx / ppd);
 
         const bar = barRefs.current[ds.taskId];
-        if (bar) {
-          bar.classList.remove('dragging');
-        }
+        if (bar) bar.classList.remove('dragging');
+        if (ds.listRowEl) ds.listRowEl.classList.remove('dragging');
+        if (ds.dropIndicatorEl) ds.dropIndicatorEl.style.display = 'none';
         const row = rowRefs.current[ds.taskId];
 
         if (ds.type === 'resize') {
@@ -221,66 +308,59 @@ export default function TaskBarContainer({
           return;
         }
 
-        const rowDelta = Math.round(dy / ROW_HEIGHT);
-        const targetRowIndex = ds.origRowIndex + rowDelta;
+        const resolved = ds.dropRow !== null
+          ? resolveTaskDropTarget(
+              {
+                type: 'task',
+                masterPhase: ds.sourceMaster,
+                subPhase: ds.sourceSub,
+                taskId: ds.taskId,
+              },
+              ds.dropRow,
+              ds.rowMap,
+            )
+          : null;
 
-        const rowMap = buildRowMap(
-          hierarchy,
-          state.currentFilter,
-          state.collapsedPhases,
-          state.collapsedSubPhases
-        );
-
-        let targetPhase: string | null = null;
-        let insertBeforeTaskId: string | undefined;
-
-        if (rowDelta !== 0 && targetRowIndex >= 0 && targetRowIndex < rowMap.length) {
-          const item = rowMap[targetRowIndex];
-          if (item.type === 'task' && item.taskId !== ds.taskId) {
-            targetPhase = `${item.masterPhase} ${item.subPhase}`;
-            insertBeforeTaskId = item.taskId;
-          } else if (item.type === 'sub-phase') {
-            targetPhase = `${item.masterPhase} ${item.subPhase}`;
-            insertBeforeTaskId = undefined;
-          } else if (item.type === 'phase') {
-            for (let i = targetRowIndex + 1; i < rowMap.length; i++) {
-              const next = rowMap[i];
-              if (next.type === 'sub-phase' && next.masterPhase === item.masterPhase) {
-                targetPhase = `${next.masterPhase} ${next.subPhase}`;
-                break;
-              }
-            }
-          }
-        }
+        const phaseChanged = !!resolved && resolved.targetPhase !== ds.origPhase;
+        const reorder =
+          !!resolved && (phaseChanged || resolved.insertBeforeTaskId !== undefined);
 
         const newStartOffset = ds.origStartDayOffset + dayDelta;
         const newDateISO = formatISO(offsetToDate(newStartOffset));
-        const task = computed.find((t) => t.id === ds.taskId);
-        const currentPhase = task?.phase;
 
-        const phaseChanged = targetPhase && targetPhase !== currentPhase;
-
-        if (phaseChanged && targetPhase) {
-          dispatch({
-            type: 'MOVE_TASK_WITH_REORDER',
-            taskId: ds.taskId,
-            newStartDate: newDateISO,
-            targetPhase,
-            insertBeforeTaskId,
-          });
+        if (reorder && resolved) {
+          if (dayDelta !== 0) {
+            dispatch({
+              type: 'MOVE_TASK_WITH_REORDER',
+              taskId: ds.taskId,
+              newStartDate: newDateISO,
+              targetPhase: resolved.targetPhase,
+              insertBeforeTaskId: resolved.insertBeforeTaskId,
+            });
+          } else {
+            dispatch({
+              type: 'MOVE_REORDER_TASK',
+              taskId: ds.taskId,
+              targetPhase: resolved.targetPhase,
+              insertBeforeTaskId: resolved.insertBeforeTaskId,
+            });
+          }
         } else if (dayDelta !== 0) {
           dispatch({ type: 'MOVE_TASK', taskId: ds.taskId, newStartDate: newDateISO });
         } else {
           const wrapper = bar?.parentElement;
           if (wrapper) wrapper.style.left = `${ds.origLeft}px`;
           if (row) row.style.top = `${ds.origTop}px`;
+          if (ds.listRowEl) ds.listRowEl.style.top = `${ds.origListTop}px`;
+          // Reset any live-updated dep paths
+          updateDepsForTask(ds.depSvg, ds.taskId, 0, 0, 0);
         }
       };
 
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     },
-    [ppd, dispatch, hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases, computed]
+    [ppd, dispatch, hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases, computed, scrollContainerRef]
   );
 
   const visibleTasks = computed.filter((t) => {
@@ -292,7 +372,7 @@ export default function TaskBarContainer({
   return (
     <div
       ref={containerRef}
-      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: Z.bars }}
+      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: Z.bars, pointerEvents: 'none' }}
     >
       {visibleTasks.map((task) => {
         const left = (task.startDayOffset - timelineStartDay) * ppd;
@@ -302,12 +382,15 @@ export default function TaskBarContainer({
         const endDate = offsetToDate(task.endDayOffset);
         const isDropTarget = hoveredTargetId === task.id;
 
+        const isSelected = state.selectedTaskId === task.id;
         return (
           <div
             key={task.id}
             ref={(el) => {
               rowRefs.current[task.id] = el;
             }}
+            data-task-row-id={task.id}
+            className={`task-bar-row${isSelected ? ' row-selected' : ''}`}
             style={{
               position: 'absolute',
               top,
@@ -327,11 +410,33 @@ export default function TaskBarContainer({
                 height: '100%',
               }}
             >
-              {/* Left port: drag to connect (target → this task); click to add-before */}
+              {/* Left cluster: outer = add-with-dep (before), inner = plain add */}
               <div
-                className="bar-add-btn left"
+                className="bar-add-btn left dep"
+                title="Add task linked as predecessor · drag to connect"
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => handleConnectMouseDown(e, task, 'backward')}
+              >
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M4 3v6a3 3 0 0 0 3 3h5" />
+                  <path d="M9 9l3 3-3 3" />
+                </svg>
+              </div>
+              <div
+                className="bar-add-btn left plain"
+                title="Add adjacent task"
+                style={{ pointerEvents: 'auto' }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dispatch({
+                    type: 'OPEN_DIALOG',
+                    dialog: { type: 'add-task', context: { phase: task.phase } },
+                  });
+                }}
               >
                 +
               </div>
@@ -349,7 +454,7 @@ export default function TaskBarContainer({
                 }`}
                 style={{
                   width,
-                  cursor: task.start ? 'grab' : 'default',
+                  cursor: 'grab',
                   position: 'relative',
                   pointerEvents: 'auto',
                   zIndex: task.isCritical ? Z.barsHover : Z.bars,
@@ -363,6 +468,11 @@ export default function TaskBarContainer({
                 onClick={(e) => {
                   e.stopPropagation();
                   if (isConnecting) return;
+                  if (didDragBarRef.current) {
+                    didDragBarRef.current = false;
+                    return;
+                  }
+                  dispatch({ type: 'SET_SELECTED_TASK', taskId: task.id });
                   dispatch({ type: 'OPEN_TASK_EDITOR', taskId: task.id });
                 }}
                 onContextMenu={(e) => {
@@ -372,6 +482,7 @@ export default function TaskBarContainer({
                 }}
                 onMouseEnter={(e) => {
                   if (dragState.current || isConnecting) return;
+                  setHover(task.id);
                   if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
                   const x = e.clientX;
                   const y = e.clientY;
@@ -384,6 +495,7 @@ export default function TaskBarContainer({
                   setTooltip({ task, x: e.clientX, y: e.clientY });
                 }}
                 onMouseLeave={() => {
+                  setHover(null);
                   if (tooltipTimerRef.current) {
                     clearTimeout(tooltipTimerRef.current);
                     tooltipTimerRef.current = null;
@@ -400,17 +512,41 @@ export default function TaskBarContainer({
                       left: 0,
                       bottom: 0,
                       width: `${Math.min(100, Math.max(0, task.progress))}%`,
-                      background: 'rgba(0,0,0,0.28)',
+                      background: 'rgba(0,0,0,0.22)',
                       pointerEvents: 'none',
                       borderRadius: 'inherit',
                     }}
                   />
                 )}
+                {task.assignee && width > 80 && (
+                  <span
+                    style={{
+                      position: 'relative',
+                      zIndex: 1,
+                      display: 'inline-flex',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <AssigneeAvatar name={task.assignee} size={20} ring />
+                  </span>
+                )}
                 <span
                   className="task-bar-text"
-                  style={{ fontSize: 10, fontWeight: 700, pointerEvents: 'none', userSelect: 'none', position: 'relative', zIndex: 1 }}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    position: 'relative',
+                    zIndex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1,
+                    minWidth: 0,
+                  }}
                 >
-                  {width > 24 ? `${task.duration}d` : ''}
+                  {width > 40 ? task.name : ''}
                 </span>
 
                 {/* Resize handle */}
@@ -423,13 +559,35 @@ export default function TaskBarContainer({
                 />
               </div>
 
-              {/* Right port: drag to connect (this task → target); click to add-after */}
+              {/* Right cluster: inner = plain add, outer = add-with-dep (after) */}
               <div
-                className="bar-add-btn right"
+                className="bar-add-btn right plain"
+                title="Add adjacent task"
+                style={{ pointerEvents: 'auto' }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dispatch({
+                    type: 'OPEN_DIALOG',
+                    dialog: { type: 'add-task', context: { phase: task.phase } },
+                  });
+                }}
+              >
+                +
+              </div>
+              <div
+                className="bar-add-btn right dep"
+                title="Add task linked as successor · drag to connect"
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => handleConnectMouseDown(e, task, 'forward')}
               >
-                +
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M4 3v6a3 3 0 0 0 3 3h5" />
+                  <path d="M9 9l3 3-3 3" />
+                </svg>
               </div>
 
               {/* Date label after bar */}
@@ -480,6 +638,21 @@ export default function TaskBarContainer({
           fontWeight: 700,
           whiteSpace: 'nowrap',
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}
+      />
+      <div
+        ref={snapGuideRef}
+        className="bar-drag-snap-guide"
+        style={{
+          position: 'absolute',
+          display: 'none',
+          pointerEvents: 'none',
+          top: 0,
+          width: 1,
+          height: '100%',
+          background: 'var(--accent)',
+          opacity: 0.55,
+          zIndex: Z.overlay,
         }}
       />
     </div>

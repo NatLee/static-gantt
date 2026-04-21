@@ -1,6 +1,7 @@
 'use client';
 
 import { Dispatch, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Check,
   Copy,
@@ -93,13 +94,15 @@ export default function TaskContextMenu({ task, x, y, dispatch, onClose }: Props
   const handleSetStatus = (status: TaskStatus) =>
     run(() => dispatch({ type: 'UPDATE_TASK', taskId: task.id, updates: { status } }));
 
-  return (
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[90] min-w-[200px] rounded-lg shadow-2xl py-1"
+      className="fixed min-w-[200px] rounded-lg shadow-2xl py-1"
       style={{
         left: position.left,
         top: position.top,
+        zIndex: 1000,
         background: 'var(--bg-panel)',
         border: '1px solid var(--border-color)',
         backdropFilter: 'blur(16px)',
@@ -143,7 +146,8 @@ export default function TaskContextMenu({ task, x, y, dispatch, onClose }: Props
         onClick={handleDelete}
         danger
       />
-    </div>
+    </div>,
+    document.body
   );
 }
 

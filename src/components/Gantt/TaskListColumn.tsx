@@ -4,9 +4,13 @@ import React, { useState } from 'react';
 import { ChevronDown, Plus, FolderOpen, CheckCircle2, Clock4, CircleDashed, GripVertical } from 'lucide-react';
 import { ComputedTask, GanttState, GanttAction, HierarchyMap } from '@/types';
 import { useDragReorder, DragSource } from '@/hooks/useDragReorder';
+import { useRowHover } from '@/hooks/useRowHover';
 import { ROW_HEIGHT, Z } from '@/lib/ganttLayout';
+import { hueFromString } from '@/lib/colorHash';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
 import TaskContextMenu from './TaskContextMenu';
+import PhaseContextMenu from './PhaseContextMenu';
+import AssigneeAvatar from './AssigneeAvatar';
 
 interface TaskListColumnProps {
   hierarchy: HierarchyMap;
@@ -68,41 +72,6 @@ function TagChips({ tags }: { tags: string[] }) {
   );
 }
 
-function AssigneeAvatar({ name }: { name: string }) {
-  const initials = name
-    .split(/\s+/)
-    .map((s) => s[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-  // Deterministic hue from name
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  const hue = Math.abs(hash) % 360;
-  return (
-    <span
-      title={name}
-      style={{
-        marginLeft: 6,
-        width: 18,
-        height: 18,
-        borderRadius: '50%',
-        background: `hsl(${hue} 70% 45%)`,
-        color: '#fff',
-        fontSize: 9,
-        fontWeight: 800,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-      }}
-    >
-      {initials || '?'}
-    </span>
-  );
-}
-
 export default function TaskListColumn({
   hierarchy,
   state,
@@ -114,9 +83,18 @@ export default function TaskListColumn({
   const inWindow = (rowIdx: number) =>
     !virtualWindow.enabled ||
     (rowIdx >= virtualWindow.startIndex && rowIdx <= virtualWindow.endIndex);
-  const { currentFilter, collapsedPhases, collapsedSubPhases } = state;
+  const { currentFilter, collapsedPhases, collapsedSubPhases, selectedTaskId } = state;
+  const { setHover } = useRowHover();
   const masterPhases = Object.keys(hierarchy);
   const [contextMenu, setContextMenu] = useState<{ task: ComputedTask; x: number; y: number } | null>(null);
+  const [phaseMenu, setPhaseMenu] = useState<{
+    kind: 'phase' | 'sub-phase';
+    masterPhase: string;
+    subPhase?: string;
+    isCollapsed: boolean;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const { startDrag, isDragging, dragSource, dropIndicatorRow } = useDragReorder(
     hierarchy,
@@ -141,10 +119,12 @@ export default function TaskListColumn({
       dragSource.masterPhase === master;
 
     // Phase header row
+    const phaseHue = hueFromString(master);
     if (inWindow(rowIndex)) rows.push(
       <div
         key={`phase-${master}`}
         data-row
+        className="phase-row"
         style={{
           position: 'absolute',
           top: rowIndex * ROW_HEIGHT,
@@ -154,10 +134,21 @@ export default function TaskListColumn({
           display: 'flex',
           alignItems: 'center',
           padding: '0 12px',
-          borderBottom: '1px solid var(--border-color)',
           opacity: isPhaseBeingDragged ? 0.35 : 1,
-          background: isPhaseBeingDragged ? 'var(--accent-glow)' : undefined,
+          background: isPhaseBeingDragged
+            ? 'var(--accent-glow)'
+            : `hsla(${phaseHue}, 65%, 55%, 0.12)`,
           transition: 'opacity 0.15s',
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setPhaseMenu({
+            kind: 'phase',
+            masterPhase: master,
+            isCollapsed: isPhaseCollapsed,
+            x: e.clientX,
+            y: e.clientY,
+          });
         }}
       >
         <span
@@ -177,7 +168,7 @@ export default function TaskListColumn({
         </span>
         <span
           style={{
-            background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+            background: `linear-gradient(135deg, hsl(${phaseHue} 70% 45%), hsl(${phaseHue} 70% 62%))`,
             color: '#fff',
             fontSize: 10,
             fontWeight: 800,
@@ -220,6 +211,7 @@ export default function TaskListColumn({
         <div
           key={`sub-${master}-${sub}`}
           data-row
+          className="sub-phase-row"
           style={{
             position: 'absolute',
             top: rowIndex * ROW_HEIGHT,
@@ -230,10 +222,22 @@ export default function TaskListColumn({
             alignItems: 'center',
             padding: '0 12px',
             paddingLeft: 20,
-            borderBottom: '1px solid var(--border-color)',
             opacity: isSubBeingDragged ? 0.35 : 1,
-            background: isSubBeingDragged ? 'var(--accent-glow)' : undefined,
+            background: isSubBeingDragged
+              ? 'var(--accent-glow)'
+              : `hsla(${phaseHue}, 55%, 55%, 0.06)`,
             transition: 'opacity 0.15s',
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setPhaseMenu({
+              kind: 'sub-phase',
+              masterPhase: master,
+              subPhase: sub,
+              isCollapsed: isSubCollapsed,
+              x: e.clientX,
+              y: e.clientY,
+            });
           }}
         >
           <span
@@ -289,6 +293,8 @@ export default function TaskListColumn({
           <div
             key={`task-${task.id}`}
             data-row
+            data-task-row-id={task.id}
+            className={`task-row${selectedTaskId === task.id ? ' row-selected' : ''}`}
             style={{
               position: 'absolute',
               top: rowIndex * ROW_HEIGHT,
@@ -299,24 +305,20 @@ export default function TaskListColumn({
               alignItems: 'center',
               padding: '0 12px',
               paddingLeft: 40,
-              borderBottom: '1px solid var(--border-color)',
               cursor: 'pointer',
-              transition: 'background 0.15s, opacity 0.15s',
+              transition: 'opacity 0.15s',
               opacity: isTaskBeingDragged ? 0.35 : 1,
-              background: isTaskBeingDragged ? 'var(--accent-glow)' : undefined,
             }}
-            onMouseEnter={(e) => {
-              if (!isTaskBeingDragged) {
-                (e.currentTarget as HTMLElement).style.background = 'var(--accent-glow)';
-              }
+            onMouseEnter={() => {
+              if (!isTaskBeingDragged) setHover(task.id);
             }}
-            onMouseLeave={(e) => {
-              if (!isTaskBeingDragged) {
-                (e.currentTarget as HTMLElement).style.background = '';
-              }
+            onMouseLeave={() => {
+              if (!isTaskBeingDragged) setHover(null);
             }}
             onClick={() => {
-              if (!isDragging) dispatch({ type: 'OPEN_TASK_EDITOR', taskId: task.id });
+              if (isDragging) return;
+              dispatch({ type: 'SET_SELECTED_TASK', taskId: task.id });
+              dispatch({ type: 'OPEN_TASK_EDITOR', taskId: task.id });
             }}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -355,7 +357,11 @@ export default function TaskListColumn({
               {task.name}
             </span>
             {task.tags && task.tags.length > 0 && <TagChips tags={task.tags} />}
-            {task.assignee && <AssigneeAvatar name={task.assignee} />}
+            {task.assignee && (
+              <span style={{ marginLeft: 6, display: 'inline-flex' }}>
+                <AssigneeAvatar name={task.assignee} />
+              </span>
+            )}
           </div>
         );
         rowIndex++;
@@ -466,7 +472,7 @@ export default function TaskListColumn({
       {rows}
       {!isDragging && addButtons}
 
-      {/* Drop indicator */}
+      {/* Drop indicator (left-list internal drag) */}
       {isDragging && dropIndicatorRow !== null && (
         <div
           className="drop-indicator"
@@ -479,6 +485,19 @@ export default function TaskListColumn({
         />
       )}
 
+      {/* Drop indicator (bar drag from right panel — imperatively shown) */}
+      <div
+        className="drop-indicator bar-drag-drop-indicator"
+        style={{
+          position: 'absolute',
+          display: 'none',
+          top: 0,
+          left: 8,
+          right: 8,
+        }}
+      />
+
+
       {contextMenu && (
         <TaskContextMenu
           task={contextMenu.task}
@@ -486,6 +505,19 @@ export default function TaskListColumn({
           y={contextMenu.y}
           dispatch={dispatch}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {phaseMenu && (
+        <PhaseContextMenu
+          kind={phaseMenu.kind}
+          masterPhase={phaseMenu.masterPhase}
+          subPhase={phaseMenu.subPhase}
+          isCollapsed={phaseMenu.isCollapsed}
+          x={phaseMenu.x}
+          y={phaseMenu.y}
+          dispatch={dispatch}
+          onClose={() => setPhaseMenu(null)}
         />
       )}
     </div>

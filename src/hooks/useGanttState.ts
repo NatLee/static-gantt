@@ -22,6 +22,7 @@ const initialState: GanttState = {
   collapsedSubPhases: new Set<string>(),
   editingTaskId: null,
   highlightedTaskId: null,
+  selectedTaskId: null,
   activeDialog: null,
   timelineStartDay: initialBounds.startDay,
   timelineEndDay: initialBounds.endDay,
@@ -71,7 +72,9 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
 
     case 'DELETE_TASK': {
       const tasks = rewireDependencies(state.tasks, action.taskId);
-      return { ...state, tasks, editingTaskId: null };
+      const clearedSelection =
+        state.selectedTaskId === action.taskId ? null : state.selectedTaskId;
+      return { ...state, tasks, editingTaskId: null, selectedTaskId: clearedSelection };
     }
 
     case 'ADD_TASK': {
@@ -306,6 +309,9 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
     case 'SET_HIGHLIGHTED_TASK':
       return { ...state, highlightedTaskId: action.taskId };
 
+    case 'SET_SELECTED_TASK':
+      return { ...state, selectedTaskId: action.taskId };
+
     case 'DUPLICATE_TASK': {
       const idx = state.tasks.findIndex(t => t.id === action.taskId);
       if (idx < 0) return state;
@@ -336,6 +342,7 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
         timelineEndDay: s.timelineEndDay,
         editingTaskId: null,
         highlightedTaskId: null,
+        selectedTaskId: null,
         activeDialog: null,
       };
     }
@@ -348,6 +355,29 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
         const after = [...existing, action.predecessorId].join(',');
         const next = { ...t, after };
         delete next.start;
+        return next;
+      });
+      return { ...state, tasks };
+    }
+
+    case 'REMOVE_TASK_DEPENDENCY': {
+      const tasks = state.tasks.map(t => {
+        if (t.id !== action.taskId || !t.after) return t;
+        const remaining = t.after
+          .split(',')
+          .map(s => s.trim())
+          .filter(s => s && s !== action.predecessorId);
+        const next = { ...t };
+        if (remaining.length > 0) {
+          next.after = remaining.join(',');
+        } else {
+          delete next.after;
+          // No predecessors left: anchor the task at its current date so it
+          // stays scheduled instead of cascading to NaN through descendants.
+          if (!next.start && action.fallbackStartDate) {
+            next.start = action.fallbackStartDate;
+          }
+        }
         return next;
       });
       return { ...state, tasks };
@@ -419,6 +449,7 @@ const NON_UNDOABLE_ACTIONS = new Set<GanttAction['type']>([
   'EXTEND_TIMELINE',
   'LOAD_PROJECT_STATE',
   'SET_HIGHLIGHTED_TASK',
+  'SET_SELECTED_TASK',
   'COLLAPSE_ALL_PHASES',
   'EXPAND_ALL_PHASES',
   'TOGGLE_LEGEND_VISIBLE',

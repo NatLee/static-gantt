@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Check, FolderOpen } from 'lucide-react';
+import { ChevronDown, Check, FolderOpen, Edit3 } from 'lucide-react';
 import type { ProjectsAPI, SaveStatus } from '@/hooks/usePersistentGanttState';
 
 interface ProjectSwitcherProps {
@@ -12,7 +12,10 @@ interface ProjectSwitcherProps {
 
 export default function ProjectSwitcher({ api, saveStatus, onOpenProjectList }: ProjectSwitcherProps) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -46,18 +49,68 @@ export default function ProjectSwitcher({ api, saveStatus, onOpenProjectList }: 
     onOpenProjectList();
   }, [onOpenProjectList]);
 
+  const startEdit = useCallback(() => {
+    if (!activeProject) return;
+    setDraftName(activeProject.name);
+    setEditing(true);
+    setOpen(false);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+  }, [activeProject]);
+
+  const commitEdit = useCallback(() => {
+    if (!activeProject) return setEditing(false);
+    const trimmed = draftName.trim();
+    if (trimmed && trimmed !== activeProject.name) {
+      api.rename(activeProject.id, trimmed);
+    }
+    setEditing(false);
+  }, [activeProject, draftName, api]);
+
+  const cancelEdit = useCallback(() => setEditing(false), []);
+
   return (
     <div ref={wrapperRef} className="project-switcher">
-      <button
-        type="button"
-        className="project-chip"
-        onClick={() => setOpen(o => !o)}
-        title="Switch project"
-      >
-        <span className="project-chip-name">{activeProject?.name || 'Untitled'}</span>
-        <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
-        <SaveDot status={saveStatus} />
-      </button>
+      {editing ? (
+        <div className="project-chip" style={{ cursor: 'text' }}>
+          <input
+            ref={inputRef}
+            value={draftName}
+            onChange={e => setDraftName(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+              else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+            }}
+            className="project-chip-name"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: 'inherit',
+              font: 'inherit',
+              padding: 0,
+              width: `${Math.max(10, draftName.length) + 1}ch`,
+              minWidth: 80,
+            }}
+          />
+          <SaveDot status={saveStatus} />
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="project-chip"
+          onClick={() => setOpen(o => !o)}
+          onDoubleClick={startEdit}
+          title="Click to switch · double-click to rename"
+        >
+          <span className="project-chip-name">{activeProject?.name || 'Untitled'}</span>
+          <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
+          <SaveDot status={saveStatus} />
+        </button>
+      )}
 
       {open && (
         <div className="project-switcher-dropdown" role="menu">
@@ -87,6 +140,11 @@ export default function ProjectSwitcher({ api, saveStatus, onOpenProjectList }: 
             </div>
           )}
           <div className="menu-divider" />
+          <button type="button" role="menuitem" className="menu-item" onClick={startEdit}>
+            <span className="menu-item-check" aria-hidden />
+            <span className="menu-item-icon" aria-hidden><Edit3 className="w-3.5 h-3.5" /></span>
+            <span className="menu-item-label">Rename this project…</span>
+          </button>
           <button type="button" role="menuitem" className="menu-item" onClick={handleManage}>
             <span className="menu-item-check" aria-hidden />
             <span className="menu-item-icon" aria-hidden><FolderOpen className="w-3.5 h-3.5" /></span>

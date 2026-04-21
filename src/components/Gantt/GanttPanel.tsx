@@ -6,6 +6,8 @@ import { offsetToDate, formatDateFull } from '@/lib/dateUtils';
 import TimelineHeader from './TimelineHeader';
 import TaskListColumn from './TaskListColumn';
 import GridBackground from './GridBackground';
+import PhaseBackgroundBands from './PhaseBackgroundBands';
+import RowDividers from './RowDividers';
 import DependencyLines from './DependencyLines';
 import MilestoneMarkers from './MilestoneMarkers';
 import TaskBarContainer from './TaskBarContainer';
@@ -300,6 +302,13 @@ export default function GanttPanel({
             onMouseMove={handleGridMouseMove}
             onMouseLeave={handleGridMouseLeave}
           >
+            <PhaseBackgroundBands
+              hierarchy={hierarchy}
+              currentFilter={state.currentFilter}
+              collapsedPhases={state.collapsedPhases}
+              collapsedSubPhases={state.collapsedSubPhases}
+              totalWidth={totalWidth}
+            />
             <GridBackground
               totalRows={totalRows}
               totalWidth={totalWidth}
@@ -348,6 +357,7 @@ export default function GanttPanel({
               totalWidth={totalWidth}
               totalHeight={totalHeight}
               virtualWindow={virtualWindow}
+              dispatch={dispatch}
             />
             <MilestoneMarkers
               milestones={state.milestones}
@@ -362,6 +372,7 @@ export default function GanttPanel({
               dispatch={dispatch}
               virtualWindow={virtualWindow}
               hierarchy={hierarchy}
+              scrollContainerRef={scrollContainerRef}
               onStartConnect={connect.startConnect}
               hoveredTargetId={connect.hoveredTargetId}
               isConnecting={connect.isConnecting}
@@ -424,6 +435,9 @@ export default function GanttPanel({
               </div>
             )}
           </div>
+
+          {/* Row dividers: shared horizontal lines spanning both sidebar and timeline */}
+          <RowDividers totalHeight={totalHeight} />
         </div>
       </div>
     </main>

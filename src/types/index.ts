@@ -59,6 +59,7 @@ export interface GanttState {
   collapsedSubPhases: Set<string>;
   editingTaskId: string | null;
   highlightedTaskId: string | null;
+  selectedTaskId: string | null;
   activeDialog: DialogState | null;
   timelineStartDay: number;
   timelineEndDay: number;
@@ -128,7 +129,9 @@ export type GanttAction =
   | { type: 'MOVE_SUB_PHASE'; subPhase: string; sourceMasterPhase: string; targetMasterPhase: string; insertBeforeSubPhase?: string }
   | { type: 'MOVE_TASK_WITH_REORDER'; taskId: string; newStartDate: string; targetPhase: string; insertBeforeTaskId?: string }
   | { type: 'ADD_TASK_DEPENDENCY'; taskId: string; predecessorId: string }
+  | { type: 'REMOVE_TASK_DEPENDENCY'; taskId: string; predecessorId: string; fallbackStartDate?: string }
   | { type: 'SET_HIGHLIGHTED_TASK'; taskId: string | null }
+  | { type: 'SET_SELECTED_TASK'; taskId: string | null }
   | { type: 'DUPLICATE_TASK'; taskId: string; newId: string }
   | { type: 'LOAD_PROJECT_STATE'; state: SerializableGanttState }
   | { type: 'COLLAPSE_ALL_PHASES' }
