@@ -83,6 +83,7 @@ export default function TaskBarContainer({
     sourceSub: string | undefined;
     listRowEl: HTMLElement | null;
     dropIndicatorEl: HTMLElement | null;
+    forbiddenIndicatorEls: HTMLElement[];
     rowMap: RowItem[];
     depSvg: SVGSVGElement | null;
     dropRow: number | null;
@@ -129,6 +130,12 @@ export default function TaskBarContainer({
       const dropIndicatorEl =
         (document.querySelector('.bar-drag-drop-indicator') as HTMLElement | null) ?? null;
 
+      // Forbidden-row indicators (left panel + right chart body). Shown when
+      // the hovered row rejects the drop (e.g. source task's own row).
+      const forbiddenIndicatorEls = Array.from(
+        document.querySelectorAll('.bar-drag-forbidden-indicator'),
+      ) as HTMLElement[];
+
       // Row map for unified drop-target resolution
       const rowMap = buildRowMap(
         hierarchy,
@@ -162,6 +169,7 @@ export default function TaskBarContainer({
         sourceSub,
         listRowEl,
         dropIndicatorEl,
+        forbiddenIndicatorEls,
         rowMap,
         depSvg,
         dropRow: null,
@@ -205,6 +213,7 @@ export default function TaskBarContainer({
           // Compute drop row using the same routine as useDragReorder
           const scrollEl = scrollContainerRef.current;
           let dropRow: number | null = null;
+          let clampedHoveredRow: number | null = null;
           if (scrollEl) {
             const listColEl = scrollEl.querySelector('.sticky-col');
             const listAreaEl = listColEl?.children[1] as HTMLElement | undefined;
@@ -216,8 +225,8 @@ export default function TaskBarContainer({
                 // Clamp so dragging past the last row still yields a valid
                 // findTaskDropRow hit; the helper can then return rowMap.length
                 // for "append at end" semantics.
-                const hr = Math.min(hoveredRow, ds.rowMap.length - 1);
-                dropRow = findTaskDropRow(hr, relativeY, ds.rowMap, {
+                clampedHoveredRow = Math.min(hoveredRow, ds.rowMap.length - 1);
+                dropRow = findTaskDropRow(clampedHoveredRow, relativeY, ds.rowMap, {
                   type: 'task',
                   masterPhase: ds.sourceMaster,
                   subPhase: ds.sourceSub,
@@ -228,13 +237,30 @@ export default function TaskBarContainer({
           }
           ds.dropRow = dropRow;
 
-          // Update drop indicator
+          const isForbiddenHover = clampedHoveredRow !== null && dropRow === null;
+
+          // Update drop indicator (valid drop → thin line between rows)
           if (ds.dropIndicatorEl) {
             if (dropRow !== null) {
               ds.dropIndicatorEl.style.display = 'block';
               ds.dropIndicatorEl.style.top = `${dropRow * ROW_HEIGHT - 1}px`;
             } else {
               ds.dropIndicatorEl.style.display = 'none';
+            }
+          }
+
+          // Update forbidden-row indicators (invalid drop → full-row red band)
+          if (ds.forbiddenIndicatorEls.length > 0) {
+            if (isForbiddenHover && clampedHoveredRow !== null) {
+              const top = clampedHoveredRow * ROW_HEIGHT;
+              ds.forbiddenIndicatorEls.forEach((el) => {
+                el.style.display = 'block';
+                el.style.top = `${top}px`;
+              });
+            } else {
+              ds.forbiddenIndicatorEls.forEach((el) => {
+                el.style.display = 'none';
+              });
             }
           }
 
@@ -296,14 +322,25 @@ export default function TaskBarContainer({
         if (bar) bar.classList.remove('dragging');
         if (ds.listRowEl) ds.listRowEl.classList.remove('dragging');
         if (ds.dropIndicatorEl) ds.dropIndicatorEl.style.display = 'none';
+        ds.forbiddenIndicatorEls.forEach((el) => { el.style.display = 'none'; });
         const row = rowRefs.current[ds.taskId];
+
+        // Reset inline styles we mutated during mousemove. React's style
+        // reconciliation is prop-diffed — if the post-dispatch rowIndex / left
+        // happens to equal the pre-drag value, React won't rewrite the DOM and
+        // the bar visually "sticks" wherever we left it. Resetting to origin
+        // before dispatch lets React's re-render land on the correct position.
+        const wrapper = bar?.parentElement;
+        if (wrapper) wrapper.style.left = `${ds.origLeft}px`;
+        if (row) row.style.top = `${ds.origTop}px`;
+        if (ds.listRowEl) ds.listRowEl.style.top = `${ds.origListTop}px`;
+        if (bar && ds.type === 'resize') bar.style.width = `${ds.origWidth}px`;
+        updateDepsForTask(ds.depSvg, ds.taskId, 0, 0, 0);
 
         if (ds.type === 'resize') {
           if (dayDelta !== 0) {
             const newDuration = Math.max(1, ds.origDuration + dayDelta);
             dispatch({ type: 'RESIZE_TASK', taskId: ds.taskId, newDuration });
-          } else if (bar) {
-            bar.style.width = `${ds.origWidth}px`;
           }
           return;
         }
@@ -347,14 +384,8 @@ export default function TaskBarContainer({
           }
         } else if (dayDelta !== 0) {
           dispatch({ type: 'MOVE_TASK', taskId: ds.taskId, newStartDate: newDateISO });
-        } else {
-          const wrapper = bar?.parentElement;
-          if (wrapper) wrapper.style.left = `${ds.origLeft}px`;
-          if (row) row.style.top = `${ds.origTop}px`;
-          if (ds.listRowEl) ds.listRowEl.style.top = `${ds.origListTop}px`;
-          // Reset any live-updated dep paths
-          updateDepsForTask(ds.depSvg, ds.taskId, 0, 0, 0);
         }
+        // else: pure click / no-movement — inline styles were already reset above.
       };
 
       document.addEventListener('mousemove', handleMouseMove);
@@ -653,6 +684,16 @@ export default function TaskBarContainer({
           background: 'var(--accent)',
           opacity: 0.55,
           zIndex: Z.overlay,
+        }}
+      />
+      {/* Right-side mirror of the forbidden-row indicator (spans chart body) */}
+      <div
+        className="bar-drag-forbidden-indicator bar-drag-forbidden-indicator-right"
+        style={{
+          display: 'none',
+          top: 0,
+          left: 0,
+          right: 0,
         }}
       />
     </div>

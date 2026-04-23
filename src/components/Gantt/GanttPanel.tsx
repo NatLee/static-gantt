@@ -2,7 +2,7 @@
 
 import React, { useRef, useCallback, useMemo, useEffect, useState } from 'react';
 import { GanttState, GanttAction, ComputedTask, HierarchyMap } from '@/types';
-import { offsetToDate, formatDateFull } from '@/lib/dateUtils';
+import { offsetToDate, formatDateFull, dateToOffset } from '@/lib/dateUtils';
 import TimelineHeader from './TimelineHeader';
 import TaskListColumn from './TaskListColumn';
 import GridBackground from './GridBackground';
@@ -100,6 +100,7 @@ export default function GanttPanel({
   const datePointerRef = useRef<HTMLDivElement>(null);
   const dateTooltipRef = useRef<HTMLDivElement>(null);
   const isExtendingRef = useRef(false);
+  const didScrollToTodayRef = useRef(false);
 
   const [pointerVisible, setPointerVisible] = useState(false);
   const sidebar = useResizableSidebar();
@@ -127,6 +128,22 @@ export default function GanttPanel({
   const totalHeight = totalRows * ROW_HEIGHT;
 
   const virtualWindow = useVirtualRows(scrollContainerRef, totalRows);
+
+  // Scroll the timeline to today on initial mount (once layout has a width).
+  useEffect(() => {
+    if (didScrollToTodayRef.current) return;
+    const el = scrollContainerRef.current;
+    if (!el || totalWidth <= 0) return;
+    const todayOffset = dateToOffset(new Date());
+    if (todayOffset < state.timelineStartDay || todayOffset > state.timelineEndDay) {
+      didScrollToTodayRef.current = true;
+      return;
+    }
+    const todayLeftPx = (todayOffset - state.timelineStartDay) * ppd;
+    // Put today at ~25% from the left edge so some past context stays visible.
+    el.scrollLeft = Math.max(0, todayLeftPx - el.clientWidth * 0.25);
+    didScrollToTodayRef.current = true;
+  }, [totalWidth, ppd, state.timelineStartDay, state.timelineEndDay]);
 
   const connect = useDragToConnect({
     tasks: state.tasks,

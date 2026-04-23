@@ -497,6 +497,17 @@ export default function TaskListColumn({
         }}
       />
 
+      {/* Forbidden-row indicator (shown when the hovered row rejects the drop) */}
+      <div
+        className="bar-drag-forbidden-indicator bar-drag-forbidden-indicator-left"
+        style={{
+          display: 'none',
+          top: 0,
+          left: 4,
+          right: 4,
+        }}
+      />
+
 
       {contextMenu && (
         <TaskContextMenu

@@ -199,6 +199,16 @@ select.custom-select {
 .drop-indicator::before { left: -4px; }
 .drop-indicator::after { right: -4px; }
 
+.bar-drag-forbidden-indicator {
+  position: absolute;
+  height: 48px;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px dashed rgba(239, 68, 68, 0.55);
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: var(--z-overlay);
+}
+
 .task-row.dragging {
   z-index: var(--z-overlay);
   background: var(--bg-card);
