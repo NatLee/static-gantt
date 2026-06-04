@@ -80,6 +80,17 @@ const ja: Record<MessageKey, string> = {
   'help.about': 'このアプリについて',
   'help.aboutBody': 'ビジュアルと Mermaid モードに対応した静的なガントチャートエディターです。',
 
+  // About dialog
+  'about.appName': 'Gantt Studio',
+  'about.version': 'v1.0',
+  'about.tagline': 'ビジュアルと Mermaid モードに対応した、高速なクライアントサイドのガントチャートエディターです。',
+  'about.features': '主な機能',
+  'about.featureVisual': '依存関係とクリティカルパスに対応したドラッグ＆ドロップのスケジューリング',
+  'about.featureMermaid': 'Mermaid ガントチャートの双方向編集',
+  'about.featureAutosave': '自動保存とブラウザー内での複数プロジェクト管理',
+  'about.featureExport': 'PNG・CSV・Mermaid へのエクスポート',
+  'about.builtWith': 'Next.js・React・TypeScript で構築',
+
   // Mode segmented + header buttons
   'mode.visual': 'ビジュアル',
   'mode.mermaid': 'Mermaid',
@@ -101,6 +112,8 @@ const ja: Record<MessageKey, string> = {
   'toolbar.allPhases': 'すべてのフェーズ',
   'toolbar.milestone': 'マイルストーン',
   'toolbar.milestoneTitle': 'マイルストーンを追加',
+  'toolbar.scrollPhasesLeft': '前のフェーズ',
+  'toolbar.scrollPhasesRight': 'さらにフェーズ',
 
   // Legend
   'legend.done': '完了',

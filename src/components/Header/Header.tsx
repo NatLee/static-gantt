@@ -16,6 +16,7 @@ interface HeaderProps {
   saveStatus: SaveStatus;
   onOpenProjectList: () => void;
   onOpenShortcuts: () => void;
+  onOpenAbout: () => void;
   onOpenSearch: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -47,6 +48,7 @@ export default function Header(props: HeaderProps) {
     saveStatus,
     onOpenProjectList,
     onOpenShortcuts,
+    onOpenAbout,
     onOpenSearch,
     onUndo,
     onRedo,
@@ -82,6 +84,7 @@ export default function Header(props: HeaderProps) {
         onRedo={onRedo}
         onOpenProjectList={onOpenProjectList}
         onOpenShortcuts={onOpenShortcuts}
+        onOpenAbout={onOpenAbout}
         onOpenSearch={onOpenSearch}
         onScrollToToday={onScrollToToday}
         onZoomIn={onZoomIn}

@@ -56,6 +56,7 @@ export interface MenubarProps {
   onRedo: () => void;
   onOpenProjectList: () => void;
   onOpenShortcuts: () => void;
+  onOpenAbout: () => void;
   onOpenSearch: () => void;
   onScrollToToday: () => void;
   onZoomIn: () => void;
@@ -82,6 +83,7 @@ export default function Menubar(props: MenubarProps) {
     onRedo,
     onOpenProjectList,
     onOpenShortcuts,
+    onOpenAbout,
     onOpenSearch,
     onScrollToToday,
     onZoomIn,
@@ -437,9 +439,7 @@ export default function Menubar(props: MenubarProps) {
           <MenuItem
             icon={<Info className="w-3.5 h-3.5" />}
             label={t('help.about')}
-            onClick={() =>
-              alert(`${PROJECT_TITLE}\n${PROJECT_SUBTITLE}\n\n${t('help.aboutBody')}`)
-            }
+            onClick={onOpenAbout}
           />
         </Menu>
       </div>

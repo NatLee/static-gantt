@@ -9,6 +9,7 @@ import TaskEditorPanel from '@/components/Editor/TaskEditorPanel';
 import AddDialog from '@/components/Dialogs/AddDialog';
 import ProjectListDialog from '@/components/Dialogs/ProjectListDialog';
 import ShortcutsDialog from '@/components/Dialogs/ShortcutsDialog';
+import AboutDialog from '@/components/Dialogs/AboutDialog';
 import WelcomeDialog from '@/components/Dialogs/WelcomeDialog';
 import EmptyState from '@/components/Gantt/EmptyState';
 import { RowHoverProvider } from '@/hooks/useRowHover';
@@ -52,6 +53,7 @@ export default function GanttApp() {
   const prevModeRef = useRef(state.currentMode);
   const [projectListOpen, setProjectListOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
 
@@ -101,6 +103,8 @@ export default function GanttApp() {
   const handleCloseProjectList = useCallback(() => setProjectListOpen(false), []);
   const handleOpenShortcuts = useCallback(() => setShortcutsOpen(true), []);
   const handleCloseShortcuts = useCallback(() => setShortcutsOpen(false), []);
+  const handleOpenAbout = useCallback(() => setAboutOpen(true), []);
+  const handleCloseAbout = useCallback(() => setAboutOpen(false), []);
   const handleOpenSearch = useCallback(() => {
     if (state.currentMode !== 'visual') dispatch({ type: 'SET_MODE', mode: 'visual' });
     setSearchOpen(true);
@@ -189,11 +193,12 @@ export default function GanttApp() {
 
   const closeTopmost = useCallback(() => {
     if (searchOpen) return setSearchOpen(false);
+    if (aboutOpen) return setAboutOpen(false);
     if (shortcutsOpen) return setShortcutsOpen(false);
     if (projectListOpen) return setProjectListOpen(false);
     if (state.activeDialog) return dispatch({ type: 'CLOSE_DIALOG' });
     if (state.editingTaskId) return dispatch({ type: 'CLOSE_TASK_EDITOR' });
-  }, [searchOpen, shortcutsOpen, projectListOpen, state.activeDialog, state.editingTaskId, dispatch]);
+  }, [searchOpen, aboutOpen, shortcutsOpen, projectListOpen, state.activeDialog, state.editingTaskId, dispatch]);
 
   useKeyboardShortcuts({
     undo,
@@ -217,6 +222,7 @@ export default function GanttApp() {
         saveStatus={saveStatus}
         onOpenProjectList={handleOpenProjectList}
         onOpenShortcuts={handleOpenShortcuts}
+        onOpenAbout={handleOpenAbout}
         onOpenSearch={handleOpenSearch}
         onUndo={undo}
         onRedo={redo}
@@ -282,6 +288,8 @@ export default function GanttApp() {
       )}
 
       {shortcutsOpen && <ShortcutsDialog onClose={handleCloseShortcuts} />}
+
+      {aboutOpen && <AboutDialog onClose={handleCloseAbout} />}
 
       {welcomeOpen && (
         <WelcomeDialog

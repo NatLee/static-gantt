@@ -308,6 +308,39 @@ select.custom-select {
   box-shadow: 0 2px 8px var(--accent-glow);
   flex-shrink: 0;
 }
+
+/* --- About dialog --- */
+.about-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px var(--accent-glow);
+  flex-shrink: 0;
+}
+.about-version {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.about-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
 .menubar-brand {
   display: none;
   flex-direction: column;
@@ -650,6 +683,82 @@ select.custom-select {
 }
 .toolbar-select:hover {
   border-color: color-mix(in srgb, var(--accent) 40%, var(--border-color));
+}
+
+/* --- Phase filter tabs (scrollable, paged) --- */
+.phase-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 380px;
+  flex-shrink: 1;
+}
+.phase-tabs-track {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.phase-tabs-track::-webkit-scrollbar {
+  display: none;
+}
+.phase-tab {
+  flex-shrink: 0;
+  height: 22px;
+  max-width: 160px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.phase-tab:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.phase-tab-active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+.phase-tabs-pager {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 26px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.phase-tabs-pager:hover {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-color));
+}
+.phase-tabs-pager-hidden {
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  border-width: 0;
+  margin: 0;
 }
 
 .toolbar-legend {

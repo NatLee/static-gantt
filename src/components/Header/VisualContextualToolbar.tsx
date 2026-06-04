@@ -10,6 +10,7 @@ import {
   Briefcase,
 } from 'lucide-react';
 import { Segmented, SegmentedButton } from './Segmented';
+import PhaseTabs from './PhaseTabs';
 import type { GanttAction, GanttState } from '@/types';
 import type { ZoomPreset } from '@/components/GanttApp';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -44,8 +45,8 @@ export default function VisualContextualToolbar({
     state.zoomScale >= 3 ? 'day' : state.zoomScale >= 1.6 ? 'week' : 'month';
 
   const handleFilterChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      dispatch({ type: 'SET_FILTER', filter: e.target.value });
+    (filter: string) => {
+      dispatch({ type: 'SET_FILTER', filter });
     },
     [dispatch]
   );
@@ -121,18 +122,11 @@ export default function VisualContextualToolbar({
 
       <div className="toolbar-sep" />
 
-      <select
-        className="toolbar-select"
-        value={state.currentFilter}
+      <PhaseTabs
+        phases={masterPhases}
+        current={state.currentFilter}
         onChange={handleFilterChange}
-      >
-        <option value="ALL">{t('toolbar.allPhases')}</option>
-        {masterPhases.map(phase => (
-          <option key={phase} value={phase}>
-            {phase}
-          </option>
-        ))}
-      </select>
+      />
 
       <button
         type="button"

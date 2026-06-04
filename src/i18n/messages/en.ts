@@ -81,6 +81,17 @@ const en = {
   'help.about': 'About',
   'help.aboutBody': 'A static Gantt chart editor with visual and Mermaid modes.',
 
+  // About dialog
+  'about.appName': 'Gantt Studio',
+  'about.version': 'v1.0',
+  'about.tagline': 'A fast, client-side Gantt chart editor with visual and Mermaid modes.',
+  'about.features': 'Highlights',
+  'about.featureVisual': 'Drag-and-drop scheduling with dependencies & critical path',
+  'about.featureMermaid': 'Two-way Mermaid Gantt editing',
+  'about.featureAutosave': 'Auto-save & multiple projects in your browser',
+  'about.featureExport': 'Export to PNG, CSV and Mermaid',
+  'about.builtWith': 'Built with Next.js, React & TypeScript',
+
   // Mode segmented + header buttons
   'mode.visual': 'Visual',
   'mode.mermaid': 'Mermaid',
@@ -102,6 +113,8 @@ const en = {
   'toolbar.allPhases': 'All Phases',
   'toolbar.milestone': 'Milestone',
   'toolbar.milestoneTitle': 'Add milestone',
+  'toolbar.scrollPhasesLeft': 'Previous phases',
+  'toolbar.scrollPhasesRight': 'More phases',
 
   // Legend
   'legend.done': 'Done',

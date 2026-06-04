@@ -80,6 +80,17 @@ const zhTW: Record<MessageKey, string> = {
   'help.about': '關於',
   'help.aboutBody': '一款支援視覺化與 Mermaid 模式的靜態甘特圖編輯器。',
 
+  // About dialog
+  'about.appName': 'Gantt Studio',
+  'about.version': 'v1.0',
+  'about.tagline': '一款快速、純前端的甘特圖編輯器，支援視覺化與 Mermaid 模式。',
+  'about.features': '功能亮點',
+  'about.featureVisual': '拖放排程，支援相依關係與關鍵路徑',
+  'about.featureMermaid': 'Mermaid 甘特圖雙向編輯',
+  'about.featureAutosave': '自動儲存，瀏覽器內多專案管理',
+  'about.featureExport': '匯出 PNG、CSV 與 Mermaid',
+  'about.builtWith': '以 Next.js、React 與 TypeScript 打造',
+
   // Mode segmented + header buttons
   'mode.visual': '視覺化',
   'mode.mermaid': 'Mermaid',
@@ -101,6 +112,8 @@ const zhTW: Record<MessageKey, string> = {
   'toolbar.allPhases': '所有階段',
   'toolbar.milestone': '里程碑',
   'toolbar.milestoneTitle': '新增里程碑',
+  'toolbar.scrollPhasesLeft': '上一頁階段',
+  'toolbar.scrollPhasesRight': '更多階段',
 
   // Legend
   'legend.done': '已完成',
