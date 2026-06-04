@@ -48,7 +48,6 @@ export interface MenubarProps {
   state: GanttState;
   dispatch: Dispatch<GanttAction>;
   computed: ComputedTask[];
-  masterPhases: string[];
   projectsApi: ProjectsAPI;
   saveStatus: SaveStatus;
   canUndo: boolean;
@@ -75,7 +74,6 @@ export default function Menubar(props: MenubarProps) {
     state,
     dispatch,
     computed,
-    masterPhases,
     projectsApi,
     saveStatus,
     canUndo,
@@ -105,11 +103,6 @@ export default function Menubar(props: MenubarProps) {
     (type: 'add-phase' | 'add-sub-phase' | 'add-task' | 'add-milestone') => {
       dispatch({ type: 'OPEN_DIALOG', dialog: { type, context: {} } });
     },
-    [dispatch]
-  );
-
-  const handleSetFilter = useCallback(
-    (filter: string) => dispatch({ type: 'SET_FILTER', filter }),
     [dispatch]
   );
 
@@ -308,23 +301,6 @@ export default function Menubar(props: MenubarProps) {
             onClick={() => onApplyZoomPreset('month')}
             disabled={isMermaid}
           />
-          <MenuDivider />
-          <MenuHeading>{t('view.phaseFilter')}</MenuHeading>
-          <MenuItem
-            label={t('view.allPhases')}
-            checked={state.currentFilter === 'ALL'}
-            onClick={() => handleSetFilter('ALL')}
-            disabled={isMermaid}
-          />
-          {masterPhases.map(phase => (
-            <MenuItem
-              key={phase}
-              label={phase}
-              checked={state.currentFilter === phase}
-              onClick={() => handleSetFilter(phase)}
-              disabled={isMermaid}
-            />
-          ))}
           <MenuDivider />
           <MenuItem
             icon={<ChevronsDownUp className="w-3.5 h-3.5" />}

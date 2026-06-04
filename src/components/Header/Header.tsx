@@ -74,7 +74,6 @@ export default function Header(props: HeaderProps) {
         state={state}
         dispatch={dispatch}
         computed={computed}
-        masterPhases={masterPhases}
         projectsApi={projectsApi}
         saveStatus={saveStatus}
         canUndo={canUndo}
