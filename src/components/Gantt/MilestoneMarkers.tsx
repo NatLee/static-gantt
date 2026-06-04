@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Diamond } from 'lucide-react';
 import { Milestone, GanttAction } from '@/types';
-import { formatDateFull } from '@/lib/dateUtils';
+import { formatDateFull, dateToOffset } from '@/lib/dateUtils';
 import { PROJECT_START_DATE } from '@/data/defaultProject';
 import { PIXELS_PER_DAY, Z } from '@/lib/ganttLayout';
 
@@ -26,9 +26,10 @@ export default function MilestoneMarkers({
 }: MilestoneMarkersProps) {
   const ppd = PIXELS_PER_DAY * zoomScale;
 
-  const [todayOffset] = useState(() =>
-    Math.round((Date.now() - PROJECT_START_DATE.getTime()) / MS_PER_DAY)
-  );
+  // Derive "today" on every render (matching GridBackground's calculation) so
+  // the dashed TODAY line never drifts a day apart from the grid's today column
+  // across a long-lived session that spans local midnight.
+  const todayOffset = dateToOffset(new Date());
 
   const todayX = (todayOffset - timelineStartDay) * ppd;
 

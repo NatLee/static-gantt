@@ -32,6 +32,8 @@ export function serializeState(state: GanttState): SerializableGanttState {
     collapsedSubPhases: Array.from(state.collapsedSubPhases),
     timelineStartDay: state.timelineStartDay,
     timelineEndDay: state.timelineEndDay,
+    workingDaysOnly: state.workingDaysOnly,
+    baseline: state.baseline,
   };
 }
 

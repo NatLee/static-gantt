@@ -20,6 +20,20 @@ export interface ComputedTask extends Task {
   startDayOffset: number;
   endDayOffset: number;
   rowIndex?: number;
+  // Critical-path (CPM) derived fields — recomputed every schedule, never persisted.
+  lateStartDayOffset: number;
+  lateEndDayOffset: number;
+  totalFloat: number; // slack in days; 0 == on the critical path
+  isOnCriticalPath: boolean;
+  // Workload: true when this task overlaps another task with the same assignee.
+  isOverallocated?: boolean;
+}
+
+/** A captured snapshot of the schedule used to show planned-vs-current drift. */
+export interface Baseline {
+  capturedAt: string;
+  // taskId -> the start/end day offsets at capture time
+  bars: Record<string, { start: number; end: number }>;
 }
 
 export interface Milestone {
@@ -64,6 +78,8 @@ export interface GanttState {
   timelineStartDay: number;
   timelineEndDay: number;
   legendVisible: boolean;
+  workingDaysOnly: boolean;
+  baseline: Baseline | null;
 }
 
 export interface SerializableGanttState {
@@ -75,6 +91,8 @@ export interface SerializableGanttState {
   collapsedSubPhases: string[];
   timelineStartDay: number;
   timelineEndDay: number;
+  workingDaysOnly?: boolean;
+  baseline?: Baseline | null;
 }
 
 export interface ProjectFile {
@@ -136,4 +154,7 @@ export type GanttAction =
   | { type: 'LOAD_PROJECT_STATE'; state: SerializableGanttState }
   | { type: 'COLLAPSE_ALL_PHASES' }
   | { type: 'EXPAND_ALL_PHASES' }
-  | { type: 'TOGGLE_LEGEND_VISIBLE' };
+  | { type: 'TOGGLE_LEGEND_VISIBLE' }
+  | { type: 'SET_WORKING_DAYS'; enabled: boolean }
+  | { type: 'CAPTURE_BASELINE' }
+  | { type: 'CLEAR_BASELINE' };

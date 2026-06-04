@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { GanttState, GanttAction, ComputedTask, HierarchyMap } from '@/types';
 import { defaultTasks, defaultMilestones, PROJECT_START_DATE } from '@/data/defaultProject';
-import { computeSchedule, buildHierarchy, computeTimelineBounds } from '@/lib/scheduler';
+import { computeSchedule, buildHierarchy, computeTimelineBounds, annotateWorkload } from '@/lib/scheduler';
 import { rewireDependencies } from '@/lib/dependencyRewire';
 import { useUndoableReducer } from './useUndoableReducer';
 
@@ -27,6 +27,8 @@ const initialState: GanttState = {
   timelineStartDay: initialBounds.startDay,
   timelineEndDay: initialBounds.endDay,
   legendVisible: true,
+  workingDaysOnly: false,
+  baseline: null,
 };
 
 function ganttReducer(state: GanttState, action: GanttAction): GanttState {
@@ -340,6 +342,8 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
         collapsedSubPhases: new Set(s.collapsedSubPhases),
         timelineStartDay: s.timelineStartDay,
         timelineEndDay: s.timelineEndDay,
+        workingDaysOnly: s.workingDaysOnly ?? false,
+        baseline: s.baseline ?? null,
         editingTaskId: null,
         highlightedTaskId: null,
         selectedTaskId: null,
@@ -399,6 +403,23 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
     case 'TOGGLE_LEGEND_VISIBLE':
       return { ...state, legendVisible: !state.legendVisible };
 
+    case 'SET_WORKING_DAYS':
+      return { ...state, workingDaysOnly: action.enabled };
+
+    case 'CAPTURE_BASELINE': {
+      const scheduled = computeSchedule(state.tasks, { workingDaysOnly: state.workingDaysOnly });
+      const bars: Record<string, { start: number; end: number }> = {};
+      scheduled.forEach(t => {
+        if (Number.isFinite(t.startDayOffset) && Number.isFinite(t.endDayOffset)) {
+          bars[t.id] = { start: t.startDayOffset, end: t.endDayOffset };
+        }
+      });
+      return { ...state, baseline: { capturedAt: new Date().toISOString(), bars } };
+    }
+
+    case 'CLEAR_BASELINE':
+      return { ...state, baseline: null };
+
     case 'MOVE_SUB_PHASE': {
       const oldPhase = `${action.sourceMasterPhase} ${action.subPhase}`;
       const newPhase = `${action.targetMasterPhase} ${action.subPhase}`;
@@ -453,6 +474,7 @@ const NON_UNDOABLE_ACTIONS = new Set<GanttAction['type']>([
   'COLLAPSE_ALL_PHASES',
   'EXPAND_ALL_PHASES',
   'TOGGLE_LEGEND_VISIBLE',
+  'SET_WORKING_DAYS',
 ]);
 
 function isUndoable(action: GanttAction): boolean {
@@ -466,7 +488,10 @@ export function useGanttState() {
     { isUndoable, maxHistory: 50 }
   );
 
-  const computed = useMemo<ComputedTask[]>(() => computeSchedule(state.tasks), [state.tasks]);
+  const computed = useMemo<ComputedTask[]>(
+    () => annotateWorkload(computeSchedule(state.tasks, { workingDaysOnly: state.workingDaysOnly })),
+    [state.tasks, state.workingDaysOnly]
+  );
   const hierarchy = useMemo<HierarchyMap>(() => buildHierarchy(computed), [computed]);
   const taskMap = useMemo(() => {
     const map = new Map<string, ComputedTask>();

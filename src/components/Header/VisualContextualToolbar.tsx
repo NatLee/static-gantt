@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Maximize2,
   Plus,
+  Briefcase,
 } from 'lucide-react';
 import { Segmented, SegmentedButton } from './Segmented';
 import type { GanttAction, GanttState } from '@/types';
@@ -78,6 +79,16 @@ export default function VisualContextualToolbar({
       >
         <CalendarDays className="w-3.5 h-3.5" />
         <span>Today</span>
+      </button>
+
+      <button
+        type="button"
+        className={`toolbar-btn${state.workingDaysOnly ? ' toolbar-btn-primary' : ''}`}
+        onClick={() => dispatch({ type: 'SET_WORKING_DAYS', enabled: !state.workingDaysOnly })}
+        title="Working-day scheduling — durations count business days and dependencies skip weekends"
+      >
+        <Briefcase className="w-3.5 h-3.5" />
+        <span>Work days</span>
       </button>
 
       <Segmented>

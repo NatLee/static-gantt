@@ -2,6 +2,8 @@
 
 import { Dispatch, useEffect, useState, useCallback, useMemo } from 'react';
 import { GanttState, GanttAction, ComputedTask, TaskStatus } from '@/types';
+import { offsetToDate, formatISO } from '@/lib/dateUtils';
+import { wouldCreateCycle } from '@/lib/cycleCheck';
 
 const COLOR_SWATCHES = [
   '#ef4444', // red
@@ -61,23 +63,47 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
       description: description.trim() || undefined,
     };
 
-    // If after is provided, use it and clear start
-    // If start is provided, use it and clear after
-    if (after.trim()) {
-      updates.after = after.trim();
+    // Sanitize the free-text predecessor list: keep only IDs that reference a
+    // real task, never the task itself, and never one that would create a
+    // dependency cycle. Any of those would leave the task (and its descendants)
+    // unschedulable — computeSchedule would resolve them to NaN and the bars
+    // would silently disappear from the chart.
+    const cleanedAfter = [
+      ...new Set(
+        after
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+          .filter(pid => pid !== editingTaskId)
+          .filter(pid => taskMap.has(pid))
+          .filter(pid => !wouldCreateCycle(state.tasks, pid, editingTaskId))
+      ),
+    ].join(',');
+
+    // Precedence: a valid predecessor wins; else a fixed start date; else fall
+    // back to anchoring at the task's current scheduled start so it never
+    // becomes unschedulable.
+    if (cleanedAfter) {
+      updates.after = cleanedAfter;
       updates.start = undefined;
     } else if (start.trim()) {
       updates.start = start.trim();
       updates.after = undefined;
     } else {
       updates.after = undefined;
-      updates.start = undefined;
+      updates.start =
+        task && Number.isFinite(task.startDayOffset)
+          ? formatISO(offsetToDate(task.startDayOffset))
+          : formatISO(new Date());
     }
 
     dispatch({ type: 'UPDATE_TASK', taskId: editingTaskId, updates });
     dispatch({ type: 'CLOSE_TASK_EDITOR' });
   }, [
     editingTaskId,
+    task,
+    state.tasks,
+    taskMap,
     name,
     duration,
     status,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useCallback, useMemo, useEffect, useState } from 'react';
+import React, { useRef, useCallback, useMemo, useEffect, useLayoutEffect, useState } from 'react';
 import { GanttState, GanttAction, ComputedTask, HierarchyMap } from '@/types';
 import { offsetToDate, formatDateFull, dateToOffset } from '@/lib/dateUtils';
 import TimelineHeader from './TimelineHeader';
@@ -101,6 +101,7 @@ export default function GanttPanel({
   const dateTooltipRef = useRef<HTMLDivElement>(null);
   const isExtendingRef = useRef(false);
   const didScrollToTodayRef = useRef(false);
+  const prevStartRef = useRef(state.timelineStartDay);
 
   const [pointerVisible, setPointerVisible] = useState(false);
   const sidebar = useResizableSidebar();
@@ -175,18 +176,26 @@ export default function GanttPanel({
     }
 
     if (el.scrollLeft <= 100) {
+      // Growing the timeline to the left shifts every bar right; the scroll
+      // compensation happens synchronously in the layout effect below (after
+      // the wider grid has committed) to avoid a clamp race / visible jump.
       isExtendingRef.current = true;
-      const prevScrollLeft = el.scrollLeft;
-      const addedWidth = 60 * ppd;
       dispatch({ type: 'EXTEND_TIMELINE', direction: 'left', days: 60 });
-      requestAnimationFrame(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollLeft = prevScrollLeft + addedWidth;
-        }
-        isExtendingRef.current = false;
-      });
     }
-  }, [dispatch, ppd]);
+  }, [dispatch]);
+
+  // Keep the viewport anchored when the timeline grows to the left. Runs after
+  // commit (so scrollWidth has already grown) and before paint (so the user
+  // never sees the intermediate shifted frame).
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current;
+    const prev = prevStartRef.current;
+    if (isExtendingRef.current && el && state.timelineStartDay < prev) {
+      el.scrollLeft += (prev - state.timelineStartDay) * ppd;
+      isExtendingRef.current = false;
+    }
+    prevStartRef.current = state.timelineStartDay;
+  }, [state.timelineStartDay, ppd]);
 
   // Zoom controls
   const handleZoomIn = useCallback(() => {

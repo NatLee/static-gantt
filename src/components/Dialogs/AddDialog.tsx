@@ -2,7 +2,7 @@
 
 import { Dispatch, useEffect, useState, useRef, useCallback } from 'react';
 import { GanttState, GanttAction, Task } from '@/types';
-import { genId } from '@/lib/dateUtils';
+import { genId, formatISO } from '@/lib/dateUtils';
 import { MS_COLORS } from '@/data/defaultProject';
 
 interface AddDialogProps {
@@ -43,14 +43,21 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
       setSubPhaseName(dialog.context.subPhase);
     }
     if (dialog.type === 'edit-milestone') {
-      setMilestoneName(dialog.context.name || '');
-      setMilestoneDate(dialog.context.date || '');
+      // The edit trigger only passes { milestoneId }, so look the milestone up
+      // from state to pre-fill the current name/date (otherwise both fields
+      // open blank and a "Save" with empty fields silently no-ops).
+      const ms = state.milestones.find(m => m.id === dialog.context.milestoneId);
+      setMilestoneName(dialog.context.name || ms?.name || '');
+      setMilestoneDate(dialog.context.date || ms?.date || '');
     }
 
     // Auto-focus first input
     setTimeout(() => {
       firstInputRef.current?.focus();
     }, 50);
+    // Intentionally only re-run when the dialog identity changes; we snapshot
+    // milestones at open time and must not reset fields on later state changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dialog]);
 
   const handleClose = useCallback(() => {
@@ -83,14 +90,18 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
     switch (dialog.type) {
       case 'add-phase': {
         const lastId = findLastTaskId();
+        const sub = subPhaseName.trim() || 'General';
         const newTask: Task = {
           id: genId(),
-          phase: `${phaseName.trim()} ${subPhaseName.trim()}`,
+          phase: `${phaseName.trim() || 'Phase'} ${sub}`,
           name: taskName.trim() || 'New Task',
           duration: Math.max(1, duration),
           status: 'planned',
           isCritical: false,
-          after: lastId,
+          // Link after the last existing task so the new phase lands at the end
+          // of the schedule; if the project is empty, anchor to today so the
+          // bar is actually schedulable (an unanchored task renders as NaN).
+          ...(lastId ? { after: lastId } : { start: formatISO(new Date()) }),
         };
         dispatch({ type: 'ADD_TASK', task: newTask });
         break;
@@ -98,25 +109,44 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
 
       case 'add-sub-phase': {
         const masterPhase = dialog.context.masterPhase;
-        const phasePrefix = masterPhase;
-        // Find last task in any sub-phase of this master phase
-        const lastId = findLastTaskId(t => t.phase.startsWith(phasePrefix));
-        const lastIdx = findLastTaskIndex(t => t.phase.startsWith(phasePrefix));
+        // Match only tasks within THIS master phase. Using a bare prefix would
+        // let "Phase 1" also match "Phase 10", "Phase 11", … — use a boundary.
+        const inMaster = (t: Task) =>
+          t.phase === masterPhase || t.phase.startsWith(`${masterPhase} `);
+        const lastId = findLastTaskId(inMaster);
+        const lastIdx = findLastTaskIndex(inMaster);
         const newTask: Task = {
           id: genId(),
-          phase: `${masterPhase} ${subPhaseName.trim()}`,
+          phase: `${masterPhase} ${subPhaseName.trim() || 'General'}`,
           name: taskName.trim() || 'New Task',
           duration: Math.max(1, duration),
           status: 'planned',
           isCritical: false,
-          after: lastId,
+          ...(lastId ? { after: lastId } : { start: formatISO(new Date()) }),
         };
         dispatch({ type: 'ADD_TASK', task: newTask, afterIndex: lastIdx });
         break;
       }
 
       case 'add-task': {
-        const fullPhase = dialog.context.phase || dialog.context.fullPhase;
+        // Resolve a valid full phase string from whatever context shape we got.
+        // The context-menu "Add task…" passes { masterPhase, subPhase } (or just
+        // { masterPhase }); the list overlay passes { phase }; the empty state
+        // passes {}. Never leave phase undefined — that crashes buildHierarchy.
+        let fullPhase = dialog.context.phase || dialog.context.fullPhase;
+        if (!fullPhase && dialog.context.masterPhase) {
+          const m = dialog.context.masterPhase;
+          if (dialog.context.subPhase) {
+            fullPhase = `${m} ${dialog.context.subPhase}`;
+          } else {
+            const firstInMaster = state.tasks.find(
+              t => t.phase === m || t.phase.startsWith(`${m} `)
+            );
+            fullPhase = firstInMaster ? firstInMaster.phase : `${m} General`;
+          }
+        }
+        if (!fullPhase) fullPhase = 'Phase 1 General';
+
         const afterTaskId = dialog.context.afterTaskId;
         // Find last task in this phase to link after
         const phaseTasks = state.tasks.filter(t => t.phase === fullPhase);
@@ -130,7 +160,9 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           duration: Math.max(1, duration),
           status: 'planned',
           isCritical: false,
-          after: linkAfter,
+          // Anchor to today when there's no predecessor to chain after, so the
+          // first task in a phase/project is always visible.
+          ...(linkAfter ? { after: linkAfter } : { start: formatISO(new Date()) }),
         };
         dispatch({ type: 'ADD_TASK', task: newTask, afterIndex: afterIdx >= 0 ? afterIdx : undefined });
         break;

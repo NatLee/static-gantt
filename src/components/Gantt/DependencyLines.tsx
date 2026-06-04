@@ -72,7 +72,11 @@ export default function DependencyLines({
 
         result.push({
           d: buildDepPath(sx, sy, ex, ey),
-          isCritical: task.isCritical && pre.isCritical,
+          // A dependency edge is critical when both endpoints are on the
+          // computed critical path (or manually flagged).
+          isCritical:
+            (task.isOnCriticalPath || task.isCritical) &&
+            (pre.isOnCriticalPath || pre.isCritical),
           arrows: buildArrowHead(ex, ey),
           taskId: task.id,
           predId: preId,

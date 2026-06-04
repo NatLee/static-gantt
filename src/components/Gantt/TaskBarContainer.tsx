@@ -10,6 +10,7 @@ import type { ConnectDirection } from '@/hooks/useDragToConnect';
 import { useRowHover } from '@/hooks/useRowHover';
 import { updateDepsForTask } from '@/lib/depLineLive';
 import { createAutoScroll, computeEdgeScrollSpeed } from '@/lib/autoScroll';
+import { AlertTriangle } from 'lucide-react';
 import TaskContextMenu from './TaskContextMenu';
 import TaskTooltip from './TaskTooltip';
 import AssigneeAvatar from './AssigneeAvatar';
@@ -407,11 +408,21 @@ export default function TaskBarContainer({
     >
       {visibleTasks.map((task) => {
         const left = (task.startDayOffset - timelineStartDay) * ppd;
-        const width = Math.max(task.duration * ppd, 12);
+        // Use the calendar span (end - start) so working-day mode bars stretch
+        // across the weekends they skip; in calendar mode this equals duration.
+        const width = Math.max((task.endDayOffset - task.startDayOffset) * ppd, 12);
         const top = (task.rowIndex ?? 0) * ROW_HEIGHT;
 
         const endDate = offsetToDate(task.endDayOffset);
         const isDropTarget = hoveredTargetId === task.id;
+
+        // Effective critical = on the computed critical path OR manually marked.
+        const effCritical = task.isOnCriticalPath || task.isCritical;
+
+        // Baseline ghost (planned-vs-current): faint bar at the captured position.
+        const base = state.baseline?.bars[task.id];
+        const baseLeft = base ? (base.start - timelineStartDay) * ppd : 0;
+        const baseWidth = base ? Math.max((base.end - base.start) * ppd, 4) : 0;
 
         const isSelected = state.selectedTaskId === task.id;
         return (
@@ -431,6 +442,26 @@ export default function TaskBarContainer({
               pointerEvents: 'none',
             }}
           >
+            {base && (
+              <div
+                className="baseline-ghost"
+                title="Baseline (planned)"
+                style={{
+                  position: 'absolute',
+                  left: baseLeft,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: baseWidth,
+                  height: 13,
+                  borderRadius: 4,
+                  background: 'var(--text-secondary)',
+                  opacity: 0.18,
+                  border: '1px dashed var(--text-secondary)',
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                }}
+              />
+            )}
             <div
               className="bar-wrapper"
               style={{
@@ -479,7 +510,7 @@ export default function TaskBarContainer({
                 }}
                 data-task-id={task.id}
                 className={`task-bar ${task.color ? '' : statusClass(task.status)} ${
-                  task.isCritical ? 'ring-[2px] ring-red-400' : ''
+                  effCritical ? 'ring-2 ring-red-400' : ''
                 } ${isDropTarget ? (connectCycleBlocked ? 'drop-target-blocked' : 'drop-target') : ''} ${
                   state.highlightedTaskId === task.id ? 'search-hit' : ''
                 }`}
@@ -488,7 +519,7 @@ export default function TaskBarContainer({
                   cursor: 'grab',
                   position: 'relative',
                   pointerEvents: 'auto',
-                  zIndex: task.isCritical ? Z.barsHover : Z.bars,
+                  zIndex: effCritical ? Z.barsHover : Z.bars,
                   ...(task.color ? { background: task.color, color: '#fff' } : {}),
                 }}
                 onMouseDown={(e) => {
@@ -580,6 +611,29 @@ export default function TaskBarContainer({
                   {width > 40 ? task.name : ''}
                 </span>
 
+                {task.isOverallocated && (
+                  <span
+                    title="Over-allocated · overlaps another task for this assignee"
+                    style={{
+                      position: 'absolute',
+                      top: 2,
+                      right: 3,
+                      zIndex: 2,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 13,
+                      height: 13,
+                      borderRadius: '50%',
+                      background: '#f59e0b',
+                      color: '#fff',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <AlertTriangle size={9} strokeWidth={2.6} />
+                  </span>
+                )}
+
                 {/* Resize handle */}
                 <div
                   className="resize-handle"
@@ -651,7 +705,7 @@ export default function TaskBarContainer({
       )}
 
       {tooltip && !contextMenu && (
-        <TaskTooltip task={tooltip.task} x={tooltip.x} y={tooltip.y} />
+        <TaskTooltip task={tooltip.task} x={tooltip.x} y={tooltip.y} baseline={state.baseline} />
       )}
 
       <div

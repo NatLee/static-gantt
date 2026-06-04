@@ -1,20 +1,38 @@
 'use client';
 
-import { ComputedTask } from '@/types';
+import { ComputedTask, Baseline } from '@/types';
 import { offsetToDate, formatDateFull } from '@/lib/dateUtils';
 
 interface Props {
   task: ComputedTask;
   x: number;
   y: number;
+  baseline?: Baseline | null;
 }
 
-export default function TaskTooltip({ task, x, y }: Props) {
+export default function TaskTooltip({ task, x, y, baseline }: Props) {
   const startDate = formatDateFull(offsetToDate(task.startDayOffset));
   const endDate = formatDateFull(offsetToDate(task.endDayOffset));
   const progress = typeof task.progress === 'number' ? task.progress : null;
   const statusLabel =
     task.status === 'done' ? 'Done' : task.status === 'in-progress' ? 'In Progress' : 'Planned';
+
+  const effCritical = task.isOnCriticalPath || task.isCritical;
+  const hasSlack = Number.isFinite(task.totalFloat);
+
+  // Baseline drift: how far the current start has slipped from the captured one.
+  const base = baseline?.bars[task.id];
+  const startDrift = base && Number.isFinite(task.startDayOffset)
+    ? task.startDayOffset - base.start
+    : null;
+  const driftLabel =
+    startDrift === null
+      ? null
+      : startDrift === 0
+        ? 'On baseline'
+        : startDrift > 0
+          ? `+${startDrift}d late`
+          : `${startDrift}d early`;
 
   const description =
     task.description && task.description.length > 120
@@ -47,7 +65,20 @@ export default function TaskTooltip({ task, x, y }: Props) {
       <Row label="Dates" value={`${startDate} → ${endDate}`} />
       <Row label="Duration" value={`${task.duration}d`} />
       <Row label="Status" value={statusLabel} />
-      {task.isCritical && <Row label="" value="⚡ Critical path" valueColor="#ef4444" />}
+      {effCritical && <Row label="" value="⚡ Critical path" valueColor="#ef4444" />}
+      {hasSlack && !effCritical && <Row label="Slack" value={`${task.totalFloat}d float`} />}
+      {task.isOverallocated && (
+        <Row label="" value="⚠ Over-allocated assignee" valueColor="#f59e0b" />
+      )}
+      {driftLabel && (
+        <Row
+          label="Baseline"
+          value={driftLabel}
+          valueColor={
+            startDrift && startDrift > 0 ? '#f59e0b' : startDrift && startDrift < 0 ? '#10b981' : undefined
+          }
+        />
+      )}
       {progress !== null && progress > 0 && <Row label="Progress" value={`${progress}%`} />}
       {task.assignee && <Row label="Assignee" value={task.assignee} />}
       {task.tags && task.tags.length > 0 && (

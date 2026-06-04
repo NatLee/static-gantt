@@ -28,6 +28,9 @@ import {
   FileDown,
   Keyboard,
   Info,
+  Briefcase,
+  Camera,
+  Eraser,
 } from 'lucide-react';
 import { Menu, MenuItem, MenuDivider, MenuHeading } from './Menu';
 import ProjectSwitcher from './ProjectSwitcher';
@@ -337,6 +340,27 @@ export default function Menubar(props: MenubarProps) {
             label={state.legendVisible ? 'Hide legend' : 'Show legend'}
             onClick={() => dispatch({ type: 'TOGGLE_LEGEND_VISIBLE' })}
             disabled={isMermaid}
+          />
+          <MenuDivider />
+          <MenuHeading>Schedule &amp; baseline</MenuHeading>
+          <MenuItem
+            icon={<Briefcase className="w-3.5 h-3.5" />}
+            label="Working days only (skip weekends)"
+            checked={state.workingDaysOnly}
+            onClick={() => dispatch({ type: 'SET_WORKING_DAYS', enabled: !state.workingDaysOnly })}
+            disabled={isMermaid}
+          />
+          <MenuItem
+            icon={<Camera className="w-3.5 h-3.5" />}
+            label={state.baseline ? 'Recapture baseline' : 'Capture baseline'}
+            onClick={() => dispatch({ type: 'CAPTURE_BASELINE' })}
+            disabled={isMermaid}
+          />
+          <MenuItem
+            icon={<Eraser className="w-3.5 h-3.5" />}
+            label="Clear baseline"
+            onClick={() => dispatch({ type: 'CLEAR_BASELINE' })}
+            disabled={isMermaid || !state.baseline}
           />
         </Menu>
 
