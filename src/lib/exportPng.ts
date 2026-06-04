@@ -2,7 +2,8 @@ export async function exportToPNG(
   targetEl: HTMLElement,
   scrollContainer: HTMLElement,
   isDark: boolean,
-  filter: string
+  filter: string,
+  failMessage = 'PNG export failed, please try again.'
 ) {
   const html2canvas = (await import('html2canvas-pro')).default;
 
@@ -42,6 +43,6 @@ export async function exportToPNG(
     scrollContainer.style.overflow = origOF;
     document.body.classList.remove('exporting-mode');
     if (!wasLight) document.documentElement.setAttribute('data-theme', 'dark');
-    alert('PNG export failed, please try again.');
+    alert(failMessage);
   }
 }

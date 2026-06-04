@@ -18,9 +18,22 @@
 - Hit-test 用 `document.elementFromPoint` + `data-task-id` 屬性。
 - 拖曳中若超過 `virtualWindow`，DOM 可能消失 → 不能假設指標下一定有 bar。
 
+## i18n（多語系）— 新增功能務必遵守
+
+所有**使用者可見文字**都必須透過 i18n，不可在元件裡寫死字串（純符號／icon 例外，例如工具列的 `D`/`W`/`M`）。新功能若加了任何文案，沒走 `t()` 視為未完成。
+
+- **字典位置**：[src/i18n/messages/](src/i18n/messages/)。`en.ts` 是**唯一真實來源**（source of truth），`MessageKey = keyof typeof en`。其餘 `zh-TW.ts` / `zh-CN.ts` / `ja.ts` 都是 `Record<MessageKey, string>` → **少 key 或多 key 都會編譯失敗**，TypeScript 幫你擋漏譯。
+- **新增一個字串**：先在 `en.ts` 加 key（用點分命名空間，如 `dialog.addTask.title`），再到 `zh-TW` / `zh-CN` / `ja` 補上同一個 key；`npx tsc --noEmit` 會列出還沒翻的 key。
+- **元件用法**：`const { t } = useI18n();` 然後 `t('key')`；要帶變數用 `{name}` 佔位符 + `t('key', { count: n })`（插值在 [I18nProvider.tsx](src/i18n/I18nProvider.tsx) 的 `interpolate`）。四個語系的佔位符 token 必須一致。
+- **語言偵測**：`navigator.languages` → `normalizeLocale`（[config.ts](src/i18n/config.ts)）。使用者用 View 選單切換時把選擇存到 localStorage `gantt-locale`；沒有覆寫時每次載入都跟隨系統語言。English 永遠是 fallback。
+- **Provider 位置**：在 [src/app/page.tsx](src/app/page.tsx) 包住 `GanttApp`，所以 `GanttApp` 以下全部都能 `useI18n`。靜態輸出為避免 hydration mismatch，初始 locale 固定 `en`，在 layout effect 內於 paint 前解析真正語系。
+- **非 React 的 lib**（如 [exportPng.ts](src/lib/exportPng.ts)）拿不到 hook → 由呼叫端把 `t('...')` 字串當參數傳進去，不要在 lib 內寫死。
+- **日期／數字格式**要跟著語系：用 `Intl`（如 [TimelineHeader.tsx](src/components/Gantt/TimelineHeader.tsx) 的月份）並把 `useI18n().locale` 當 BCP-47 tag 傳入。
+
 ## 關鍵檔案
 
 - [src/hooks/useGanttState.ts](src/hooks/useGanttState.ts) — 單一 reducer
+- [src/i18n/](src/i18n/) — i18n 基礎建設（`config` 偵測、`I18nProvider`/`useI18n`/`t`、`messages/` 四語系字典，`en` 為來源）
 - [src/lib/scheduler.ts](src/lib/scheduler.ts) — 依賴解析、關鍵路徑計算
 - [src/lib/cycleCheck.ts](src/lib/cycleCheck.ts) — 新增依賴前的 DFS cycle 檢查
 - [src/lib/depPath.ts](src/lib/depPath.ts) — 依賴線的 SVG path 路由（right-angle / bezier），`DependencyLines` 與拖曳預覽線共用

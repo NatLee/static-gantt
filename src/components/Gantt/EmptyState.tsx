@@ -3,6 +3,7 @@
 import { Dispatch } from 'react';
 import { FilePlus, ListPlus, Sparkles } from 'lucide-react';
 import { GanttAction } from '@/types';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface Props {
   dispatch: Dispatch<GanttAction>;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function EmptyState({ dispatch, onLoadDefault }: Props) {
+  const { t } = useI18n();
   const openAddPhase = () =>
     dispatch({ type: 'OPEN_DIALOG', dialog: { type: 'add-phase', context: {} } });
   const openAddTask = () =>
@@ -33,13 +35,12 @@ export default function EmptyState({ dispatch, onLoadDefault }: Props) {
         >
           <Sparkles className="w-6 h-6" />
         </div>
-        <h2 className="text-base font-bold mb-1">This project is empty</h2>
+        <h2 className="text-base font-bold mb-1">{t('empty.title')}</h2>
         <p
           className="text-xs mb-5 leading-relaxed"
           style={{ color: 'var(--text-secondary)' }}
         >
-          Start by adding a phase and a few tasks, or load the sample project to
-          see the layout in action.
+          {t('empty.body')}
         </p>
 
         <div className="flex flex-col gap-2">
@@ -49,7 +50,7 @@ export default function EmptyState({ dispatch, onLoadDefault }: Props) {
             type="button"
           >
             <FilePlus className="w-3.5 h-3.5" />
-            Add your first phase
+            {t('empty.addPhase')}
           </button>
           <button
             className="btn-glass text-xs font-semibold px-4 py-2.5 rounded-lg cursor-pointer flex items-center justify-center gap-2"
@@ -57,7 +58,7 @@ export default function EmptyState({ dispatch, onLoadDefault }: Props) {
             type="button"
           >
             <ListPlus className="w-3.5 h-3.5" />
-            Add a task
+            {t('empty.addTask')}
           </button>
           <button
             className="text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer"
@@ -65,7 +66,7 @@ export default function EmptyState({ dispatch, onLoadDefault }: Props) {
             onClick={onLoadDefault}
             type="button"
           >
-            Or load the sample project
+            {t('empty.loadSample')}
           </button>
         </div>
       </div>

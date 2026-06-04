@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useI18n } from '@/i18n/I18nProvider';
+import type { MessageKey } from '@/i18n/messages';
 
 interface Props {
   onClose: () => void;
@@ -9,51 +11,52 @@ interface Props {
 
 interface Row {
   keys: string[];
-  label: string;
+  labelKey: MessageKey;
 }
 
 interface Section {
-  title: string;
+  titleKey: MessageKey;
   rows: Row[];
 }
 
 const SECTIONS: Section[] = [
   {
-    title: 'General',
+    titleKey: 'shortcuts.general',
     rows: [
-      { keys: ['?'], label: 'Show this cheatsheet' },
-      { keys: ['Esc'], label: 'Close dialogs / panels' },
+      { keys: ['?'], labelKey: 'shortcuts.showCheatsheet' },
+      { keys: ['Esc'], labelKey: 'shortcuts.closeDialogs' },
     ],
   },
   {
-    title: 'History',
+    titleKey: 'shortcuts.history',
     rows: [
-      { keys: ['⌘/Ctrl', 'Z'], label: 'Undo' },
-      { keys: ['⌘/Ctrl', 'Shift', 'Z'], label: 'Redo' },
-      { keys: ['⌘/Ctrl', 'Y'], label: 'Redo (alt)' },
+      { keys: ['⌘/Ctrl', 'Z'], labelKey: 'shortcuts.undo' },
+      { keys: ['⌘/Ctrl', 'Shift', 'Z'], labelKey: 'shortcuts.redo' },
+      { keys: ['⌘/Ctrl', 'Y'], labelKey: 'shortcuts.redoAlt' },
     ],
   },
   {
-    title: 'Navigation',
+    titleKey: 'shortcuts.navigation',
     rows: [
-      { keys: ['⌘/Ctrl', 'F'], label: 'Search tasks' },
-      { keys: ['T'], label: 'Scroll to today' },
-      { keys: ['+'], label: 'Zoom in' },
-      { keys: ['-'], label: 'Zoom out' },
+      { keys: ['⌘/Ctrl', 'F'], labelKey: 'shortcuts.search' },
+      { keys: ['T'], labelKey: 'shortcuts.today' },
+      { keys: ['+'], labelKey: 'shortcuts.zoomIn' },
+      { keys: ['-'], labelKey: 'shortcuts.zoomOut' },
     ],
   },
   {
-    title: 'Mermaid editor',
+    titleKey: 'shortcuts.mermaidEditor',
     rows: [
-      { keys: ['⌘/Ctrl', 'Shift', 'S'], label: 'Insert section' },
-      { keys: ['⌘/Ctrl', 'Shift', 'T'], label: 'Insert task' },
-      { keys: ['⌘/Ctrl', 'Shift', 'M'], label: 'Insert milestone' },
-      { keys: ['⌘/Ctrl', 'Shift', 'F'], label: 'Format' },
+      { keys: ['⌘/Ctrl', 'Shift', 'S'], labelKey: 'shortcuts.insertSection' },
+      { keys: ['⌘/Ctrl', 'Shift', 'T'], labelKey: 'shortcuts.insertTask' },
+      { keys: ['⌘/Ctrl', 'Shift', 'M'], labelKey: 'shortcuts.insertMilestone' },
+      { keys: ['⌘/Ctrl', 'Shift', 'F'], labelKey: 'shortcuts.format' },
     ],
   },
 ];
 
 export default function ShortcutsDialog({ onClose }: Props) {
+  const { t } = useI18n();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === '?') {
@@ -71,13 +74,13 @@ export default function ShortcutsDialog({ onClose }: Props) {
       <div className="add-dialog" style={{ width: 440 }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-            Keyboard shortcuts
+            {t('shortcuts.title')}
           </h3>
           <button
             className="btn-glass rounded-md p-1 cursor-pointer"
             onClick={onClose}
             type="button"
-            title="Close"
+            title={t('common.close')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -85,17 +88,17 @@ export default function ShortcutsDialog({ onClose }: Props) {
 
         <div className="flex flex-col gap-4">
           {SECTIONS.map(section => (
-            <div key={section.title}>
+            <div key={section.titleKey}>
               <div
                 className="text-[10px] font-bold uppercase tracking-wider mb-1.5"
                 style={{ color: 'var(--text-secondary)' }}
               >
-                {section.title}
+                {t(section.titleKey)}
               </div>
               <div className="flex flex-col gap-1">
                 {section.rows.map(r => (
-                  <div key={r.label} className="flex items-center justify-between text-xs">
-                    <span style={{ color: 'var(--text-primary)' }}>{r.label}</span>
+                  <div key={r.labelKey} className="flex items-center justify-between text-xs">
+                    <span style={{ color: 'var(--text-primary)' }}>{t(r.labelKey)}</span>
                     <div className="flex items-center gap-1">
                       {r.keys.map((k, i) => (
                         <span key={i} className="flex items-center gap-1">

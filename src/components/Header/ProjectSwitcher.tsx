@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Check, FolderOpen, Edit3 } from 'lucide-react';
 import type { ProjectsAPI, SaveStatus } from '@/hooks/usePersistentGanttState';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface ProjectSwitcherProps {
   api: ProjectsAPI;
@@ -11,6 +12,7 @@ interface ProjectSwitcherProps {
 }
 
 export default function ProjectSwitcher({ api, saveStatus, onOpenProjectList }: ProjectSwitcherProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -104,9 +106,9 @@ export default function ProjectSwitcher({ api, saveStatus, onOpenProjectList }: 
           className="project-chip"
           onClick={() => setOpen(o => !o)}
           onDoubleClick={startEdit}
-          title="Click to switch · double-click to rename"
+          title={t('switcher.title')}
         >
-          <span className="project-chip-name">{activeProject?.name || 'Untitled'}</span>
+          <span className="project-chip-name">{activeProject?.name || t('switcher.untitled')}</span>
           <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
           <SaveDot status={saveStatus} />
         </button>
@@ -114,7 +116,7 @@ export default function ProjectSwitcher({ api, saveStatus, onOpenProjectList }: 
 
       {open && (
         <div className="project-switcher-dropdown" role="menu">
-          <div className="menu-heading">Switch project</div>
+          <div className="menu-heading">{t('switcher.switchProject')}</div>
           {sortedProjects.slice(0, 8).map(p => {
             const active = p.id === api.activeProjectId;
             return (
@@ -136,19 +138,19 @@ export default function ProjectSwitcher({ api, saveStatus, onOpenProjectList }: 
           })}
           {sortedProjects.length > 8 && (
             <div className="menu-heading" style={{ opacity: 0.6 }}>
-              +{sortedProjects.length - 8} more
+              {t('switcher.more', { count: sortedProjects.length - 8 })}
             </div>
           )}
           <div className="menu-divider" />
           <button type="button" role="menuitem" className="menu-item" onClick={startEdit}>
             <span className="menu-item-check" aria-hidden />
             <span className="menu-item-icon" aria-hidden><Edit3 className="w-3.5 h-3.5" /></span>
-            <span className="menu-item-label">Rename this project…</span>
+            <span className="menu-item-label">{t('switcher.renameThis')}</span>
           </button>
           <button type="button" role="menuitem" className="menu-item" onClick={handleManage}>
             <span className="menu-item-check" aria-hidden />
             <span className="menu-item-icon" aria-hidden><FolderOpen className="w-3.5 h-3.5" /></span>
-            <span className="menu-item-label">Manage projects…</span>
+            <span className="menu-item-label">{t('switcher.manage')}</span>
           </button>
         </div>
       )}
@@ -157,13 +159,14 @@ export default function ProjectSwitcher({ api, saveStatus, onOpenProjectList }: 
 }
 
 function SaveDot({ status }: { status: SaveStatus }) {
+  const { t } = useI18n();
   if (status === 'idle') return null;
   const saving = status === 'saving';
   return (
     <span
       className="save-dot"
-      title={saving ? 'Saving…' : 'Saved'}
-      aria-label={saving ? 'Saving' : 'Saved'}
+      title={saving ? t('switcher.saving') : t('switcher.saved')}
+      aria-label={saving ? t('switcher.saving') : t('switcher.saved')}
       style={{
         background: saving ? 'var(--text-secondary)' : '#10b981',
         animation: saving ? 'save-pulse 1s ease-in-out infinite' : undefined,

@@ -6,6 +6,7 @@ import { Milestone, GanttAction } from '@/types';
 import { formatDateFull, dateToOffset } from '@/lib/dateUtils';
 import { PROJECT_START_DATE } from '@/data/defaultProject';
 import { PIXELS_PER_DAY, Z } from '@/lib/ganttLayout';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const MS_PER_DAY = 86400000;
 
@@ -24,6 +25,7 @@ export default function MilestoneMarkers({
   totalHeight,
   dispatch,
 }: MilestoneMarkersProps) {
+  const { t } = useI18n();
   const ppd = PIXELS_PER_DAY * zoomScale;
 
   // Derive "today" on every render (matching GridBackground's calculation) so
@@ -63,7 +65,7 @@ export default function MilestoneMarkers({
             padding: '2px 4px',
           }}
         >
-          TODAY
+          {t('ms.today')}
         </div>
       </div>
 

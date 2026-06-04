@@ -4,6 +4,7 @@ import { Dispatch, useEffect, useState, useCallback, useMemo } from 'react';
 import { GanttState, GanttAction, ComputedTask, TaskStatus } from '@/types';
 import { offsetToDate, formatISO } from '@/lib/dateUtils';
 import { wouldCreateCycle } from '@/lib/cycleCheck';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const COLOR_SWATCHES = [
   '#ef4444', // red
@@ -24,6 +25,7 @@ interface TaskEditorPanelProps {
 }
 
 export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditorPanelProps) {
+  const { t } = useI18n();
   const { editingTaskId } = state;
   const task = useMemo(() => editingTaskId ? taskMap.get(editingTaskId) : undefined, [editingTaskId, taskMap]);
 
@@ -161,14 +163,14 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
               </svg>
             </div>
             <div>
-              <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Edit Task</h2>
+              <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{t('editor.title')}</h2>
               <p className="text-[11px] font-mono" style={{ color: 'var(--text-secondary)' }}>{editingTaskId}</p>
             </div>
           </div>
           <button
             className="btn-glass rounded-lg p-1.5 cursor-pointer"
             onClick={handleClose}
-            title="Close"
+            title={t('editor.close')}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -182,7 +184,7 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
           {/* Task Name */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Task Name
+              {t('editor.taskName')}
             </label>
             <input
               type="text"
@@ -195,7 +197,7 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
           {/* Duration */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Duration (days)
+              {t('editor.duration')}
             </label>
             <input
               type="number"
@@ -209,7 +211,7 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
           {/* Status Toggle */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Status
+              {t('editor.status')}
             </label>
             <div className="flex gap-2">
               <button
@@ -219,7 +221,7 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
                 onClick={() => setStatus('done')}
                 type="button"
               >
-                Done &#10003;
+                {t('status.done')} &#10003;
               </button>
               <button
                 className={`flex-1 text-xs font-semibold py-2 rounded-lg border cursor-pointer transition-all ${
@@ -228,7 +230,7 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
                 onClick={() => setStatus('in-progress')}
                 type="button"
               >
-                In Progress &#9673;
+                {t('status.inProgress')} &#9673;
               </button>
               <button
                 className={`flex-1 text-xs font-semibold py-2 rounded-lg border cursor-pointer transition-all ${
@@ -237,7 +239,7 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
                 onClick={() => setStatus('planned')}
                 type="button"
               >
-                Planned &#9675;
+                {t('status.planned')} &#9675;
               </button>
             </div>
           </div>
@@ -256,19 +258,19 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
               className="text-xs font-semibold cursor-pointer"
               style={{ color: 'var(--text-primary)' }}
             >
-              Critical Path
+              {t('editor.criticalPath')}
             </label>
           </div>
 
           {/* Predecessor */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Predecessor Task ID
+              {t('editor.predecessor')}
             </label>
             <input
               type="text"
               className="input-field"
-              placeholder="e.g. p1a or p1a,p1b"
+              placeholder={t('editor.predecessorPh')}
               value={after}
               onChange={(e) => setAfter(e.target.value)}
             />
@@ -277,7 +279,7 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
           {/* Fixed Start Date */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Fixed Start Date
+              {t('editor.fixedStart')}
             </label>
             <input
               type="date"
@@ -290,7 +292,7 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
           {/* Progress */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider flex items-center justify-between" style={{ color: 'var(--text-secondary)' }}>
-              <span>Progress</span>
+              <span>{t('editor.progress')}</span>
               <span className="font-mono text-[10px]" style={{ color: 'var(--text-primary)' }}>{progress}%</span>
             </label>
             <input
@@ -307,7 +309,7 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
           {/* Color */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Color override
+              {t('editor.color')}
             </label>
             <div className="flex items-center gap-2 flex-wrap">
               <button
@@ -320,7 +322,7 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
                   border: '1px solid var(--border-color)',
                 }}
               >
-                Auto
+                {t('editor.colorAuto')}
               </button>
               {COLOR_SWATCHES.map((c) => (
                 <button
@@ -342,12 +344,12 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
           {/* Assignee */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Assignee
+              {t('editor.assignee')}
             </label>
             <input
               type="text"
               className="input-field"
-              placeholder="e.g. Alice"
+              placeholder={t('editor.assigneePh')}
               value={assignee}
               onChange={(e) => setAssignee(e.target.value)}
             />
@@ -356,12 +358,12 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
           {/* Tags */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Tags (comma separated)
+              {t('editor.tags')}
             </label>
             <input
               type="text"
               className="input-field"
-              placeholder="e.g. frontend, blocked"
+              placeholder={t('editor.tagsPh')}
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
             />
@@ -370,12 +372,12 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
           {/* Description */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Description
+              {t('editor.description')}
             </label>
             <textarea
               className="input-field"
               rows={3}
-              placeholder="Free-form notes..."
+              placeholder={t('editor.descriptionPh')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -390,14 +392,14 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
             onClick={handleDelete}
             type="button"
           >
-            Delete Task
+            {t('editor.deleteTask')}
           </button>
           <button
             className="btn-primary text-xs font-semibold px-5 py-2 rounded-lg cursor-pointer"
             onClick={handleApply}
             type="button"
           >
-            Apply Changes
+            {t('editor.apply')}
           </button>
         </div>
       </div>

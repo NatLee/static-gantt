@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { GanttAction, Task, TaskStatus } from '@/types';
 import { genId } from '@/lib/dateUtils';
+import { useI18n } from '@/i18n/I18nProvider';
+import type { MessageKey } from '@/i18n/messages';
 
 interface Props {
   task: Task;
@@ -23,13 +25,14 @@ interface Props {
   onClose: () => void;
 }
 
-const STATUS_OPTIONS: Array<{ value: TaskStatus; label: string }> = [
-  { value: 'planned', label: 'Planned' },
-  { value: 'in-progress', label: 'In progress' },
-  { value: 'done', label: 'Done' },
+const STATUS_OPTIONS: Array<{ value: TaskStatus; labelKey: MessageKey }> = [
+  { value: 'planned', labelKey: 'status.planned' },
+  { value: 'in-progress', labelKey: 'ctx.statusInProgress' },
+  { value: 'done', labelKey: 'status.done' },
 ];
 
 export default function TaskContextMenu({ task, x, y, dispatch, onClose }: Props) {
+  const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y, measured: false });
 
@@ -112,19 +115,19 @@ export default function TaskContextMenu({ task, x, y, dispatch, onClose }: Props
     >
       <MenuLabel>{task.name}</MenuLabel>
       <Divider />
-      <Item icon={<Edit className="w-3 h-3" />} label="Edit..." onClick={handleEdit} />
-      <Item icon={<Copy className="w-3 h-3" />} label="Duplicate" onClick={handleDuplicate} />
-      <Item icon={<Hash className="w-3 h-3" />} label={`Copy ID (${task.id})`} onClick={handleCopyId} />
+      <Item icon={<Edit className="w-3 h-3" />} label={t('ctx.edit')} onClick={handleEdit} />
+      <Item icon={<Copy className="w-3 h-3" />} label={t('ctx.duplicate')} onClick={handleDuplicate} />
+      <Item icon={<Hash className="w-3 h-3" />} label={t('ctx.copyId', { id: task.id })} onClick={handleCopyId} />
       <Divider />
-      <Item icon={<Plus className="w-3 h-3" />} label="Add before" onClick={handleAddBefore} />
-      <Item icon={<Plus className="w-3 h-3" />} label="Add after" onClick={handleAddAfter} />
+      <Item icon={<Plus className="w-3 h-3" />} label={t('ctx.addBefore')} onClick={handleAddBefore} />
+      <Item icon={<Plus className="w-3 h-3" />} label={t('ctx.addAfter')} onClick={handleAddAfter} />
       <Divider />
       <Item
         icon={<Zap className="w-3 h-3" style={{ color: task.isCritical ? '#ef4444' : undefined }} />}
-        label={task.isCritical ? 'Unmark critical' : 'Mark critical'}
+        label={task.isCritical ? t('ctx.unmarkCritical') : t('ctx.markCritical')}
         onClick={handleToggleCritical}
       />
-      <SubLabel>Status</SubLabel>
+      <SubLabel>{t('ctx.status')}</SubLabel>
       {STATUS_OPTIONS.map(opt => (
         <Item
           key={opt.value}
@@ -135,14 +138,14 @@ export default function TaskContextMenu({ task, x, y, dispatch, onClose }: Props
               <Flag className="w-3 h-3 opacity-40" />
             )
           }
-          label={opt.label}
+          label={t(opt.labelKey)}
           onClick={() => handleSetStatus(opt.value)}
         />
       ))}
       <Divider />
       <Item
         icon={<Trash2 className="w-3 h-3" />}
-        label="Delete"
+        label={t('ctx.delete')}
         onClick={handleDelete}
         danger
       />

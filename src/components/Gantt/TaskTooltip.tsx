@@ -2,6 +2,7 @@
 
 import { ComputedTask, Baseline } from '@/types';
 import { offsetToDate, formatDateFull } from '@/lib/dateUtils';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface Props {
   task: ComputedTask;
@@ -11,11 +12,16 @@ interface Props {
 }
 
 export default function TaskTooltip({ task, x, y, baseline }: Props) {
+  const { t } = useI18n();
   const startDate = formatDateFull(offsetToDate(task.startDayOffset));
   const endDate = formatDateFull(offsetToDate(task.endDayOffset));
   const progress = typeof task.progress === 'number' ? task.progress : null;
   const statusLabel =
-    task.status === 'done' ? 'Done' : task.status === 'in-progress' ? 'In Progress' : 'Planned';
+    task.status === 'done'
+      ? t('status.done')
+      : task.status === 'in-progress'
+        ? t('status.inProgress')
+        : t('status.planned');
 
   const effCritical = task.isOnCriticalPath || task.isCritical;
   const hasSlack = Number.isFinite(task.totalFloat);
@@ -29,10 +35,10 @@ export default function TaskTooltip({ task, x, y, baseline }: Props) {
     startDrift === null
       ? null
       : startDrift === 0
-        ? 'On baseline'
+        ? t('tip.onBaseline')
         : startDrift > 0
-          ? `+${startDrift}d late`
-          : `${startDrift}d early`;
+          ? t('tip.driftLate', { days: startDrift })
+          : t('tip.driftEarly', { days: Math.abs(startDrift) });
 
   const description =
     task.description && task.description.length > 120
@@ -62,29 +68,29 @@ export default function TaskTooltip({ task, x, y, baseline }: Props) {
         {task.phase}
       </div>
 
-      <Row label="Dates" value={`${startDate} → ${endDate}`} />
-      <Row label="Duration" value={`${task.duration}d`} />
-      <Row label="Status" value={statusLabel} />
-      {effCritical && <Row label="" value="⚡ Critical path" valueColor="#ef4444" />}
-      {hasSlack && !effCritical && <Row label="Slack" value={`${task.totalFloat}d float`} />}
+      <Row label={t('tip.dates')} value={`${startDate} → ${endDate}`} />
+      <Row label={t('tip.duration')} value={t('tip.days', { days: task.duration })} />
+      <Row label={t('tip.status')} value={statusLabel} />
+      {effCritical && <Row label="" value={t('tip.criticalPath')} valueColor="#ef4444" />}
+      {hasSlack && !effCritical && <Row label={t('tip.slackLabel')} value={t('tip.slack', { days: task.totalFloat })} />}
       {task.isOverallocated && (
-        <Row label="" value="⚠ Over-allocated assignee" valueColor="#f59e0b" />
+        <Row label="" value={t('tip.overallocated')} valueColor="#f59e0b" />
       )}
       {driftLabel && (
         <Row
-          label="Baseline"
+          label={t('tip.baseline')}
           value={driftLabel}
           valueColor={
             startDrift && startDrift > 0 ? '#f59e0b' : startDrift && startDrift < 0 ? '#10b981' : undefined
           }
         />
       )}
-      {progress !== null && progress > 0 && <Row label="Progress" value={`${progress}%`} />}
-      {task.assignee && <Row label="Assignee" value={task.assignee} />}
+      {progress !== null && progress > 0 && <Row label={t('tip.progress')} value={`${progress}%`} />}
+      {task.assignee && <Row label={t('tip.assignee')} value={task.assignee} />}
       {task.tags && task.tags.length > 0 && (
-        <Row label="Tags" value={task.tags.join(', ')} />
+        <Row label={t('tip.tags')} value={task.tags.join(', ')} />
       )}
-      {task.after && <Row label="After" value={task.after} mono />}
+      {task.after && <Row label={t('tip.after')} value={task.after} mono />}
       {description && (
         <div
           className="mt-1.5 pt-1.5 text-[11px]"

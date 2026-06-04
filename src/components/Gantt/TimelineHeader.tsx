@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { offsetToDate, formatDateFull } from '@/lib/dateUtils';
+import { useI18n } from '@/i18n/I18nProvider';
 
 import { PIXELS_PER_DAY } from '@/lib/ganttLayout';
 
@@ -18,10 +19,14 @@ export default function TimelineHeader({
   zoomScale,
   totalWidth,
 }: TimelineHeaderProps) {
+  const { locale } = useI18n();
   const ppd = PIXELS_PER_DAY * zoomScale;
   const totalDays = timelineEndDay - timelineStartDay;
 
   const monthCells = useMemo(() => {
+    // Locale-aware short month name (e.g. "Mar" / "3月" / "3月") for the narrow header.
+    const monthFmt = new Intl.DateTimeFormat(locale, { month: 'short' });
+    const monthShort = (year: number, month: number) => monthFmt.format(new Date(year, month, 1));
     const cells: { label: string; left: number; width: number; idx: number }[] = [];
     let curMonth = -1;
     let curYear = -1;
@@ -38,7 +43,7 @@ export default function TimelineHeader({
             label:
               ppd >= 8
                 ? `${curYear} / ${String(curMonth + 1).padStart(2, '0')}`
-                : `${curMonth + 1}月`,
+                : monthShort(curYear, curMonth),
             left: monthStart * ppd,
             width: (d - monthStart) * ppd,
             idx: cells.length,
@@ -55,7 +60,7 @@ export default function TimelineHeader({
         label:
           ppd >= 8
             ? `${curYear} / ${String(curMonth + 1).padStart(2, '0')}`
-            : `${curMonth + 1}月`,
+            : monthShort(curYear, curMonth),
         left: monthStart * ppd,
         width: (totalDays - monthStart) * ppd,
         idx: cells.length,
@@ -63,7 +68,7 @@ export default function TimelineHeader({
     }
 
     return cells;
-  }, [timelineStartDay, totalDays, ppd]);
+  }, [timelineStartDay, totalDays, ppd, locale]);
 
   const dayOrWeekCells = useMemo(() => {
     if (ppd >= 15) {

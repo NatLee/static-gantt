@@ -12,6 +12,7 @@ import {
 import { Segmented, SegmentedButton } from './Segmented';
 import type { GanttAction, GanttState } from '@/types';
 import type { ZoomPreset } from '@/components/GanttApp';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface Props {
   state: GanttState;
@@ -38,6 +39,7 @@ export default function VisualContextualToolbar({
   onApplyZoomPreset,
   onFitToScreen,
 }: Props) {
+  const { t } = useI18n();
   const currentZoomPreset: ZoomPreset =
     state.zoomScale >= 3 ? 'day' : state.zoomScale >= 1.6 ? 'week' : 'month';
 
@@ -57,13 +59,13 @@ export default function VisualContextualToolbar({
       <Segmented>
         <SegmentedButton
           icon={<Undo2 className="w-3.5 h-3.5" />}
-          title="Undo (⌘Z)"
+          title={t('toolbar.undo')}
           onClick={onUndo}
           disabled={!canUndo}
         />
         <SegmentedButton
           icon={<Redo2 className="w-3.5 h-3.5" />}
-          title="Redo (⇧⌘Z)"
+          title={t('toolbar.redo')}
           onClick={onRedo}
           disabled={!canRedo}
         />
@@ -75,44 +77,44 @@ export default function VisualContextualToolbar({
         type="button"
         className="toolbar-btn"
         onClick={onScrollToToday}
-        title="Scroll to today (T)"
+        title={t('toolbar.todayTitle')}
       >
         <CalendarDays className="w-3.5 h-3.5" />
-        <span>Today</span>
+        <span>{t('toolbar.today')}</span>
       </button>
 
       <button
         type="button"
         className={`toolbar-btn${state.workingDaysOnly ? ' toolbar-btn-primary' : ''}`}
         onClick={() => dispatch({ type: 'SET_WORKING_DAYS', enabled: !state.workingDaysOnly })}
-        title="Working-day scheduling — durations count business days and dependencies skip weekends"
+        title={t('toolbar.workDaysTitle')}
       >
         <Briefcase className="w-3.5 h-3.5" />
-        <span>Work days</span>
+        <span>{t('toolbar.workDays')}</span>
       </button>
 
       <Segmented>
         <SegmentedButton
           label="D"
-          title="Day view"
+          title={t('toolbar.dayTitle')}
           active={currentZoomPreset === 'day'}
           onClick={() => onApplyZoomPreset('day')}
         />
         <SegmentedButton
           label="W"
-          title="Week view"
+          title={t('toolbar.weekTitle')}
           active={currentZoomPreset === 'week'}
           onClick={() => onApplyZoomPreset('week')}
         />
         <SegmentedButton
           label="M"
-          title="Month view"
+          title={t('toolbar.monthTitle')}
           active={currentZoomPreset === 'month'}
           onClick={() => onApplyZoomPreset('month')}
         />
         <SegmentedButton
           icon={<Maximize2 className="w-3 h-3" />}
-          title="Fit to screen"
+          title={t('toolbar.fitTitle')}
           onClick={onFitToScreen}
         />
       </Segmented>
@@ -124,7 +126,7 @@ export default function VisualContextualToolbar({
         value={state.currentFilter}
         onChange={handleFilterChange}
       >
-        <option value="ALL">All Phases</option>
+        <option value="ALL">{t('toolbar.allPhases')}</option>
         {masterPhases.map(phase => (
           <option key={phase} value={phase}>
             {phase}
@@ -136,20 +138,20 @@ export default function VisualContextualToolbar({
         type="button"
         className="toolbar-btn toolbar-btn-primary"
         onClick={handleAddMilestone}
-        title="Add milestone"
+        title={t('toolbar.milestoneTitle')}
       >
         <Plus className="w-3.5 h-3.5" />
-        <span>Milestone</span>
+        <span>{t('toolbar.milestone')}</span>
       </button>
 
       <div className="toolbar-spacer" />
 
       {state.legendVisible && (
         <div className="toolbar-legend">
-          <LegendPill color="#10b981" label="Done" />
-          <LegendPill color="#6366f1" label="In Progress" />
-          <LegendPill variant="planned" label="Planned" />
-          <LegendPill variant="critical" label="Critical" />
+          <LegendPill color="#10b981" label={t('legend.done')} />
+          <LegendPill color="#6366f1" label={t('legend.inProgress')} />
+          <LegendPill variant="planned" label={t('legend.planned')} />
+          <LegendPill variant="critical" label={t('legend.critical')} />
         </div>
       )}
     </>

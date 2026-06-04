@@ -10,6 +10,7 @@ import {
   FileUp,
 } from 'lucide-react';
 import { Segmented, SegmentedButton } from './Segmented';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface Props {
   canUndo: boolean;
@@ -36,6 +37,7 @@ export default function MermaidContextualToolbar({
   onDownloadMmd,
   onImportMmd,
 }: Props) {
+  const { t } = useI18n();
   const mmdInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportClick = () => mmdInputRef.current?.click();
@@ -55,13 +57,13 @@ export default function MermaidContextualToolbar({
       <Segmented>
         <SegmentedButton
           icon={<Undo2 className="w-3.5 h-3.5" />}
-          title="Undo (⌘Z)"
+          title={t('toolbar.undo')}
           onClick={onUndo}
           disabled={!canUndo}
         />
         <SegmentedButton
           icon={<Redo2 className="w-3.5 h-3.5" />}
-          title="Redo (⇧⌘Z)"
+          title={t('toolbar.redo')}
           onClick={onRedo}
           disabled={!canRedo}
         />
@@ -69,35 +71,35 @@ export default function MermaidContextualToolbar({
 
       <div className="toolbar-sep" />
 
-      <button type="button" className="toolbar-btn" onClick={onInsertSection} title="Insert section (⌘⇧S)">
+      <button type="button" className="toolbar-btn" onClick={onInsertSection} title={t('mtoolbar.sectionTitle')}>
         <Plus className="w-3.5 h-3.5" />
-        <span>Section</span>
+        <span>{t('mtoolbar.section')}</span>
       </button>
-      <button type="button" className="toolbar-btn" onClick={onInsertTask} title="Insert task (⌘⇧T)">
+      <button type="button" className="toolbar-btn" onClick={onInsertTask} title={t('mtoolbar.taskTitle')}>
         <Plus className="w-3.5 h-3.5" />
-        <span>Task</span>
+        <span>{t('mtoolbar.task')}</span>
       </button>
-      <button type="button" className="toolbar-btn" onClick={onInsertMilestone} title="Insert milestone (⌘⇧M)">
+      <button type="button" className="toolbar-btn" onClick={onInsertMilestone} title={t('mtoolbar.milestoneTitle')}>
         <Plus className="w-3.5 h-3.5" />
-        <span>Milestone</span>
+        <span>{t('mtoolbar.milestone')}</span>
       </button>
 
       <div className="toolbar-sep" />
 
-      <button type="button" className="toolbar-btn" onClick={onFormat} title="Format (⌘⇧F)">
+      <button type="button" className="toolbar-btn" onClick={onFormat} title={t('mtoolbar.formatTitle')}>
         <AlignLeft className="w-3.5 h-3.5" />
-        <span>Format</span>
+        <span>{t('mtoolbar.format')}</span>
       </button>
 
       <div className="toolbar-spacer" />
 
-      <button type="button" className="toolbar-btn" onClick={handleImportClick} title="Import .mmd file">
+      <button type="button" className="toolbar-btn" onClick={handleImportClick} title={t('mtoolbar.importTitle')}>
         <FileUp className="w-3.5 h-3.5" />
-        <span>Import</span>
+        <span>{t('mtoolbar.import')}</span>
       </button>
-      <button type="button" className="toolbar-btn" onClick={onDownloadMmd} title="Download as .mmd">
+      <button type="button" className="toolbar-btn" onClick={onDownloadMmd} title={t('mtoolbar.downloadTitle')}>
         <FileDown className="w-3.5 h-3.5" />
-        <span>Download</span>
+        <span>{t('mtoolbar.download')}</span>
       </button>
 
       <input

@@ -11,6 +11,7 @@ import type { VirtualWindow } from '@/hooks/useVirtualRows';
 import TaskContextMenu from './TaskContextMenu';
 import PhaseContextMenu from './PhaseContextMenu';
 import AssigneeAvatar from './AssigneeAvatar';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface TaskListColumnProps {
   hierarchy: HierarchyMap;
@@ -80,6 +81,7 @@ export default function TaskListColumn({
   scrollContainerRef,
   virtualWindow,
 }: TaskListColumnProps) {
+  const { t } = useI18n();
   const inWindow = (rowIdx: number) =>
     !virtualWindow.enabled ||
     (rowIdx >= virtualWindow.startIndex && rowIdx <= virtualWindow.endIndex);
@@ -396,7 +398,7 @@ export default function TaskListColumn({
             }
           >
             <Plus size={12} />
-            Add Task
+            {t('list.addTask')}
           </div>
         </div>
       );
@@ -431,7 +433,7 @@ export default function TaskListColumn({
           }
         >
           <Plus size={12} />
-          Add Sub-Phase
+          {t('list.addSubPhase')}
         </div>
       </div>
     );
@@ -462,7 +464,7 @@ export default function TaskListColumn({
         }
       >
         <Plus size={12} />
-        Add Phase
+        {t('list.addPhase')}
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ import { dateToOffset } from '@/lib/dateUtils';
 import { PIXELS_PER_DAY } from '@/lib/ganttLayout';
 import dynamic from 'next/dynamic';
 import type { MermaidPanelHandle } from '@/components/Mermaid/MermaidPanel';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const ZOOM_PRESETS = {
   day: 4,     // ppd 20
@@ -46,6 +47,7 @@ export default function GanttApp() {
     canUndo,
     canRedo,
   } = usePersistentGanttState();
+  const { t } = useI18n();
   const mermaidRef = useRef<MermaidPanelHandle>(null);
   const prevModeRef = useRef(state.currentMode);
   const [projectListOpen, setProjectListOpen] = useState(false);
@@ -169,9 +171,9 @@ export default function GanttApp() {
     const scrollContainer = document.getElementById('gantt-scroll-container');
     if (!target || !scrollContainer) return;
     import('@/lib/exportPng').then(({ exportToPNG }) => {
-      exportToPNG(target, scrollContainer, state.isDark, state.currentFilter);
+      exportToPNG(target, scrollContainer, state.isDark, state.currentFilter, t('export.pngFailed'));
     });
-  }, [state.isDark, state.currentFilter]);
+  }, [state.isDark, state.currentFilter, t]);
 
   const mermaidInsertSection = useCallback(() => mermaidRef.current?.insertSection?.(), []);
   const mermaidInsertTask = useCallback(() => mermaidRef.current?.insertTask?.(), []);

@@ -11,6 +11,7 @@ import { useRowHover } from '@/hooks/useRowHover';
 import { updateDepsForTask } from '@/lib/depLineLive';
 import { createAutoScroll, computeEdgeScrollSpeed } from '@/lib/autoScroll';
 import { AlertTriangle } from 'lucide-react';
+import { useI18n } from '@/i18n/I18nProvider';
 import TaskContextMenu from './TaskContextMenu';
 import TaskTooltip from './TaskTooltip';
 import AssigneeAvatar from './AssigneeAvatar';
@@ -56,6 +57,7 @@ export default function TaskBarContainer({
   const ppd = PIXELS_PER_DAY * state.zoomScale;
   const { timelineStartDay } = state;
   const { setHover } = useRowHover();
+  const { t } = useI18n();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const barRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -445,7 +447,7 @@ export default function TaskBarContainer({
             {base && (
               <div
                 className="baseline-ghost"
-                title="Baseline (planned)"
+                title={t('bar.baselineGhost')}
                 style={{
                   position: 'absolute',
                   left: baseLeft,
@@ -475,7 +477,7 @@ export default function TaskBarContainer({
               {/* Left cluster: outer = add-with-dep (before), inner = plain add */}
               <div
                 className="bar-add-btn left dep"
-                title="Add task linked as predecessor · drag to connect"
+                title={t('bar.addLinkedPred')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => handleConnectMouseDown(e, task, 'backward')}
               >
@@ -486,7 +488,7 @@ export default function TaskBarContainer({
               </div>
               <div
                 className="bar-add-btn left plain"
-                title="Add adjacent task"
+                title={t('bar.addAdjacent')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -613,7 +615,7 @@ export default function TaskBarContainer({
 
                 {task.isOverallocated && (
                   <span
-                    title="Over-allocated · overlaps another task for this assignee"
+                    title={t('bar.overallocated')}
                     style={{
                       position: 'absolute',
                       top: 2,
@@ -647,7 +649,7 @@ export default function TaskBarContainer({
               {/* Right cluster: inner = plain add, outer = add-with-dep (after) */}
               <div
                 className="bar-add-btn right plain"
-                title="Add adjacent task"
+                title={t('bar.addAdjacent')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -665,7 +667,7 @@ export default function TaskBarContainer({
               </div>
               <div
                 className="bar-add-btn right dep"
-                title="Add task linked as successor · drag to connect"
+                title={t('bar.addLinkedSucc')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => handleConnectMouseDown(e, task, 'forward')}
               >

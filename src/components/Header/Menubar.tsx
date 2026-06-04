@@ -40,6 +40,9 @@ import { exportToExcel } from '@/lib/exportExcel';
 import type { GanttAction, GanttState, ComputedTask } from '@/types';
 import type { ProjectsAPI, SaveStatus } from '@/hooks/usePersistentGanttState';
 import type { ZoomPreset } from '@/components/GanttApp';
+import { useI18n } from '@/i18n/I18nProvider';
+import { LOCALES, LOCALE_LABELS } from '@/i18n/config';
+import { Languages } from 'lucide-react';
 
 export interface MenubarProps {
   state: GanttState;
@@ -94,6 +97,7 @@ export default function Menubar(props: MenubarProps) {
     onImportMmd,
   } = props;
 
+  const { t, locale, setLocale } = useI18n();
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const mmdInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,12 +121,12 @@ export default function Menubar(props: MenubarProps) {
         const text = await file.text();
         await projectsApi.importJsonText(text);
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Import failed');
+        alert(err instanceof Error ? err.message : t('file.importFailed'));
       } finally {
         if (jsonInputRef.current) jsonInputRef.current.value = '';
       }
     },
-    [projectsApi]
+    [projectsApi, t]
   );
 
   const handleMmdFileChange = useCallback(
@@ -167,63 +171,63 @@ export default function Menubar(props: MenubarProps) {
 
       <div className="menubar-center">
         {/* File */}
-        <Menu label="File">
+        <Menu label={t('menu.file')}>
           <MenuItem
             icon={<FilePlus className="w-3.5 h-3.5" />}
-            label="New (empty)"
+            label={t('file.newEmpty')}
             onClick={() => projectsApi.createEmpty()}
           />
           <MenuItem
             icon={<FilePlus className="w-3.5 h-3.5" />}
-            label="New from template"
+            label={t('file.newTemplate')}
             onClick={() => projectsApi.createFromDefault()}
           />
           <MenuDivider />
           <MenuItem
             icon={<FolderOpen className="w-3.5 h-3.5" />}
-            label="Open / Manage…"
+            label={t('file.openManage')}
             onClick={onOpenProjectList}
           />
           <MenuItem
             icon={<Copy className="w-3.5 h-3.5" />}
-            label="Duplicate current"
+            label={t('file.duplicate')}
             onClick={() => projectsApi.duplicateActive()}
           />
           <MenuItem
             icon={<FileText className="w-3.5 h-3.5" />}
-            label="Rename current…"
+            label={t('file.rename')}
             onClick={onOpenProjectList}
           />
           <MenuDivider />
           <MenuItem
             icon={<Download className="w-3.5 h-3.5" />}
-            label="Download JSON"
+            label={t('file.downloadJson')}
             onClick={() => projectsApi.downloadActive()}
           />
           <MenuItem
             icon={<HardDriveDownload className="w-3.5 h-3.5" />}
-            label="Download backup (all)"
+            label={t('file.downloadBackup')}
             onClick={() => projectsApi.downloadAll()}
           />
           <MenuItem
             icon={<Upload className="w-3.5 h-3.5" />}
-            label="Import JSON…"
+            label={t('file.importJson')}
             onClick={() => jsonInputRef.current?.click()}
           />
         </Menu>
 
         {/* Edit */}
-        <Menu label="Edit">
+        <Menu label={t('menu.edit')}>
           <MenuItem
             icon={<Undo2 className="w-3.5 h-3.5" />}
-            label="Undo"
+            label={t('edit.undo')}
             shortcut="⌘Z"
             onClick={onUndo}
             disabled={!canUndo}
           />
           <MenuItem
             icon={<Redo2 className="w-3.5 h-3.5" />}
-            label="Redo"
+            label={t('edit.redo')}
             shortcut="⇧⌘Z"
             onClick={onRedo}
             disabled={!canRedo}
@@ -231,18 +235,18 @@ export default function Menubar(props: MenubarProps) {
           <MenuDivider />
           <MenuItem
             icon={<Search className="w-3.5 h-3.5" />}
-            label="Find task…"
+            label={t('edit.find')}
             shortcut="⌘F"
             onClick={onOpenSearch}
           />
         </Menu>
 
         {/* View */}
-        <Menu label="View">
-          <MenuHeading>Theme</MenuHeading>
+        <Menu label={t('menu.view')}>
+          <MenuHeading>{t('view.theme')}</MenuHeading>
           <MenuItem
             icon={<Sun className="w-3.5 h-3.5" />}
-            label="Light"
+            label={t('view.light')}
             checked={!state.isDark}
             onClick={() => {
               if (state.isDark) dispatch({ type: 'TOGGLE_THEME' });
@@ -250,7 +254,7 @@ export default function Menubar(props: MenubarProps) {
           />
           <MenuItem
             icon={<Moon className="w-3.5 h-3.5" />}
-            label="Dark"
+            label={t('view.dark')}
             checked={state.isDark}
             onClick={() => {
               if (!state.isDark) dispatch({ type: 'TOGGLE_THEME' });
@@ -259,55 +263,55 @@ export default function Menubar(props: MenubarProps) {
           <MenuDivider />
           <MenuItem
             icon={<CalendarDays className="w-3.5 h-3.5" />}
-            label="Scroll to today"
+            label={t('view.scrollToday')}
             shortcut="T"
             onClick={onScrollToToday}
             disabled={isMermaid}
           />
           <MenuItem
             icon={<ZoomIn className="w-3.5 h-3.5" />}
-            label="Zoom in"
+            label={t('view.zoomIn')}
             shortcut="+"
             onClick={onZoomIn}
             disabled={isMermaid}
           />
           <MenuItem
             icon={<ZoomOut className="w-3.5 h-3.5" />}
-            label="Zoom out"
+            label={t('view.zoomOut')}
             shortcut="−"
             onClick={onZoomOut}
             disabled={isMermaid}
           />
           <MenuItem
             icon={<Maximize2 className="w-3.5 h-3.5" />}
-            label="Fit to screen"
+            label={t('view.fit')}
             onClick={onFitToScreen}
             disabled={isMermaid}
           />
           <MenuDivider />
-          <MenuHeading>Zoom preset</MenuHeading>
+          <MenuHeading>{t('view.zoomPreset')}</MenuHeading>
           <MenuItem
-            label="Day view"
+            label={t('view.dayView')}
             checked={!isMermaid && currentZoomPreset === 'day'}
             onClick={() => onApplyZoomPreset('day')}
             disabled={isMermaid}
           />
           <MenuItem
-            label="Week view"
+            label={t('view.weekView')}
             checked={!isMermaid && currentZoomPreset === 'week'}
             onClick={() => onApplyZoomPreset('week')}
             disabled={isMermaid}
           />
           <MenuItem
-            label="Month view"
+            label={t('view.monthView')}
             checked={!isMermaid && currentZoomPreset === 'month'}
             onClick={() => onApplyZoomPreset('month')}
             disabled={isMermaid}
           />
           <MenuDivider />
-          <MenuHeading>Phase filter</MenuHeading>
+          <MenuHeading>{t('view.phaseFilter')}</MenuHeading>
           <MenuItem
-            label="All phases"
+            label={t('view.allPhases')}
             checked={state.currentFilter === 'ALL'}
             onClick={() => handleSetFilter('ALL')}
             disabled={isMermaid}
@@ -324,130 +328,141 @@ export default function Menubar(props: MenubarProps) {
           <MenuDivider />
           <MenuItem
             icon={<ChevronsDownUp className="w-3.5 h-3.5" />}
-            label="Collapse all phases"
+            label={t('view.collapseAll')}
             onClick={() => dispatch({ type: 'COLLAPSE_ALL_PHASES' })}
             disabled={isMermaid}
           />
           <MenuItem
             icon={<ChevronsUpDown className="w-3.5 h-3.5" />}
-            label="Expand all phases"
+            label={t('view.expandAll')}
             onClick={() => dispatch({ type: 'EXPAND_ALL_PHASES' })}
             disabled={isMermaid}
           />
           <MenuDivider />
           <MenuItem
             icon={state.legendVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            label={state.legendVisible ? 'Hide legend' : 'Show legend'}
+            label={state.legendVisible ? t('view.hideLegend') : t('view.showLegend')}
             onClick={() => dispatch({ type: 'TOGGLE_LEGEND_VISIBLE' })}
             disabled={isMermaid}
           />
           <MenuDivider />
-          <MenuHeading>Schedule &amp; baseline</MenuHeading>
+          <MenuHeading>{t('view.scheduleBaseline')}</MenuHeading>
           <MenuItem
             icon={<Briefcase className="w-3.5 h-3.5" />}
-            label="Working days only (skip weekends)"
+            label={t('view.workingDays')}
             checked={state.workingDaysOnly}
             onClick={() => dispatch({ type: 'SET_WORKING_DAYS', enabled: !state.workingDaysOnly })}
             disabled={isMermaid}
           />
           <MenuItem
             icon={<Camera className="w-3.5 h-3.5" />}
-            label={state.baseline ? 'Recapture baseline' : 'Capture baseline'}
+            label={state.baseline ? t('view.recaptureBaseline') : t('view.captureBaseline')}
             onClick={() => dispatch({ type: 'CAPTURE_BASELINE' })}
             disabled={isMermaid}
           />
           <MenuItem
             icon={<Eraser className="w-3.5 h-3.5" />}
-            label="Clear baseline"
+            label={t('view.clearBaseline')}
             onClick={() => dispatch({ type: 'CLEAR_BASELINE' })}
             disabled={isMermaid || !state.baseline}
           />
+          <MenuDivider />
+          <MenuHeading>{t('view.language')}</MenuHeading>
+          {LOCALES.map(loc => (
+            <MenuItem
+              key={loc}
+              icon={<Languages className="w-3.5 h-3.5" />}
+              label={LOCALE_LABELS[loc]}
+              checked={locale === loc}
+              onClick={() => setLocale(loc)}
+            />
+          ))}
         </Menu>
 
         {/* Insert */}
-        <Menu label="Insert">
+        <Menu label={t('menu.insert')}>
           <MenuItem
             icon={<Plus className="w-3.5 h-3.5" />}
-            label="Phase…"
+            label={t('insert.phase')}
             onClick={() => openDialog('add-phase')}
           />
           <MenuItem
             icon={<Plus className="w-3.5 h-3.5" />}
-            label="Sub-phase…"
+            label={t('insert.subPhase')}
             onClick={() => openDialog('add-sub-phase')}
           />
           <MenuItem
             icon={<Plus className="w-3.5 h-3.5" />}
-            label="Task…"
+            label={t('insert.task')}
             onClick={() => openDialog('add-task')}
           />
           <MenuItem
             icon={<Plus className="w-3.5 h-3.5" />}
-            label="Milestone…"
+            label={t('insert.milestone')}
             onClick={() => openDialog('add-milestone')}
           />
         </Menu>
 
         {/* Export */}
-        <Menu label="Export">
-          <MenuHeading>Gantt</MenuHeading>
+        <Menu label={t('menu.export')}>
+          <MenuHeading>{t('export.gantt')}</MenuHeading>
           <MenuItem
             icon={<Download className="w-3.5 h-3.5" />}
-            label="CSV (Excel)"
+            label={t('export.csv')}
             onClick={() => exportToExcel(computed, state.currentFilter)}
           />
           <MenuItem
             icon={<ImageIcon className="w-3.5 h-3.5" />}
-            label="PNG"
+            label={t('export.png')}
             onClick={onExportPNG}
             disabled={isMermaid}
           />
           <MenuItem
             icon={<Download className="w-3.5 h-3.5" />}
-            label="JSON (current project)"
+            label={t('export.jsonProject')}
             onClick={() => projectsApi.downloadActive()}
           />
           <MenuDivider />
-          <MenuHeading>Mermaid</MenuHeading>
+          <MenuHeading>{t('export.mermaid')}</MenuHeading>
           <MenuItem
             icon={<ImageIcon className="w-3.5 h-3.5" />}
-            label="SVG"
+            label={t('export.svg')}
             onClick={onExportMermaidSVG}
             disabled={!isMermaid}
           />
           <MenuItem
             icon={<ImageIcon className="w-3.5 h-3.5" />}
-            label="PNG"
+            label={t('export.png')}
             onClick={onExportMermaidPNG}
             disabled={!isMermaid}
           />
           <MenuItem
             icon={<FileDown className="w-3.5 h-3.5" />}
-            label=".mmd file"
+            label={t('export.mmdFile')}
             onClick={onDownloadMmd}
             disabled={!isMermaid}
           />
           <MenuItem
             icon={<Upload className="w-3.5 h-3.5" />}
-            label="Import .mmd…"
+            label={t('export.importMmd')}
             onClick={() => mmdInputRef.current?.click()}
             disabled={!isMermaid}
           />
         </Menu>
 
         {/* Help */}
-        <Menu label="Help">
+        <Menu label={t('menu.help')}>
           <MenuItem
             icon={<Keyboard className="w-3.5 h-3.5" />}
-            label="Keyboard shortcuts"
+            label={t('help.shortcuts')}
             shortcut="?"
             onClick={onOpenShortcuts}
           />
           <MenuItem
             icon={<Info className="w-3.5 h-3.5" />}
-            label="About"
+            label={t('help.about')}
             onClick={() =>
-              alert(`${PROJECT_TITLE}\n${PROJECT_SUBTITLE}\n\nA static Gantt chart editor with visual and Mermaid modes.`)
+              alert(`${PROJECT_TITLE}\n${PROJECT_SUBTITLE}\n\n${t('help.aboutBody')}`)
             }
           />
         </Menu>
@@ -456,12 +471,12 @@ export default function Menubar(props: MenubarProps) {
       <div className="menubar-right">
         <Segmented>
           <SegmentedButton
-            label="Visual"
+            label={t('mode.visual')}
             active={state.currentMode === 'visual'}
             onClick={() => handleSetMode('visual')}
           />
           <SegmentedButton
-            label="Mermaid"
+            label={t('mode.mermaid')}
             active={state.currentMode === 'mermaid'}
             onClick={() => handleSetMode('mermaid')}
           />
@@ -470,7 +485,7 @@ export default function Menubar(props: MenubarProps) {
           type="button"
           className="icon-btn"
           onClick={() => dispatch({ type: 'TOGGLE_THEME' })}
-          title={state.isDark ? 'Switch to light' : 'Switch to dark'}
+          title={state.isDark ? t('mode.switchLight') : t('mode.switchDark')}
         >
           {state.isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
         </button>
@@ -478,7 +493,7 @@ export default function Menubar(props: MenubarProps) {
           type="button"
           className="icon-btn"
           onClick={onOpenShortcuts}
-          title="Keyboard shortcuts (?)"
+          title={t('mode.shortcutsTitle')}
         >
           <Keyboard className="w-4 h-4" />
         </button>

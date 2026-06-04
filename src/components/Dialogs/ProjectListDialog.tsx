@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, Copy, Download, Pencil, Trash2, X } from 'lucide-react';
 import type { ProjectsAPI } from '@/hooks/usePersistentGanttState';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface Props {
   api: ProjectsAPI;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function ProjectListDialog({ api, onClose }: Props) {
+  const { t } = useI18n();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -57,13 +59,13 @@ export default function ProjectListDialog({ api, onClose }: Props) {
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-            Projects ({api.projects.length})
+            {t('projects.title', { count: api.projects.length })}
           </h3>
           <button
             className="btn-glass rounded-md p-1 cursor-pointer"
             onClick={onClose}
             type="button"
-            title="Close"
+            title={t('common.close')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -121,7 +123,10 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                         {p.name}
                       </div>
                       <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                        {p.taskCount} task{p.taskCount === 1 ? '' : 's'} · {formatDate(p.updatedAt)}
+                        {p.taskCount === 1
+                          ? t('projects.taskOne', { count: p.taskCount })
+                          : t('projects.taskOther', { count: p.taskCount })}{' '}
+                        · {formatDate(p.updatedAt)}
                       </div>
                     </>
                   )}
@@ -144,7 +149,7 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                           }}
                           type="button"
                         >
-                          Delete
+                          {t('common.delete')}
                         </button>
                         <button
                           className="text-[10px] font-medium px-2 py-1 rounded cursor-pointer"
@@ -152,14 +157,14 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                           onClick={() => setConfirmDeleteId(null)}
                           type="button"
                         >
-                          Cancel
+                          {t('common.cancel')}
                         </button>
                       </>
                     ) : (
                       <>
                         <IconButton
                           icon={<Pencil className="w-3 h-3" />}
-                          title="Rename"
+                          title={t('common.rename')}
                           onClick={() => {
                             setRenamingId(p.id);
                             setRenameValue(p.name);
@@ -167,7 +172,7 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                         />
                         <IconButton
                           icon={<Copy className="w-3 h-3" />}
-                          title="Duplicate"
+                          title={t('common.duplicate')}
                           onClick={() => {
                             if (!isActive) api.switchTo(p.id);
                             api.duplicateActive();
@@ -175,7 +180,7 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                         />
                         <IconButton
                           icon={<Download className="w-3 h-3" />}
-                          title="Download"
+                          title={t('common.download')}
                           onClick={() => {
                             if (!isActive) api.switchTo(p.id);
                             api.downloadActive();
@@ -183,7 +188,7 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                         />
                         <IconButton
                           icon={<Trash2 className="w-3 h-3" />}
-                          title="Delete"
+                          title={t('common.delete')}
                           variant="danger"
                           onClick={() => setConfirmDeleteId(p.id)}
                         />
@@ -202,7 +207,7 @@ export default function ProjectListDialog({ api, onClose }: Props) {
             onClick={onClose}
             type="button"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>

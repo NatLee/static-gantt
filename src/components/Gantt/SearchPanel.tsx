@@ -3,6 +3,7 @@
 import { Dispatch, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { GanttAction, Task } from '@/types';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface Props {
   tasks: Task[];
@@ -14,6 +15,7 @@ interface Props {
 const MAX_RESULTS = 10;
 
 export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props) {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,7 +105,7 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search task by name, id, or phase..."
+          placeholder={t('search.placeholder')}
           className="flex-1 bg-transparent outline-none text-sm"
           style={{ color: 'var(--text-primary)' }}
         />
@@ -111,7 +113,7 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
           className="btn-glass rounded p-1 cursor-pointer"
           onClick={onClose}
           type="button"
-          title="Close (Esc)"
+          title={t('search.close')}
         >
           <X className="w-3 h-3" />
         </button>
@@ -124,7 +126,7 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
               className="px-3 py-4 text-xs text-center"
               style={{ color: 'var(--text-secondary)' }}
             >
-              No matches
+              {t('search.noMatches')}
             </div>
           ) : (
             results.map((task, i) => (
@@ -148,7 +150,7 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
                     className="text-[10px] truncate mt-0.5"
                     style={{ color: 'var(--text-secondary)' }}
                   >
-                    {task.phase} · <span className="font-mono">{task.id}</span> · {task.duration}d
+                    {task.phase} · <span className="font-mono">{task.id}</span> · {t('tip.days', { days: task.duration })}
                   </div>
                 </div>
                 <StatusBadge status={task.status} />
@@ -163,7 +165,7 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
           className="px-3 py-2 text-[10px]"
           style={{ color: 'var(--text-secondary)' }}
         >
-          Type to search. <kbd>↑</kbd>/<kbd>↓</kbd> navigate · <kbd>Enter</kbd> pick · <kbd>Esc</kbd> close
+          {t('search.hintPrefix')} <kbd>↑</kbd>/<kbd>↓</kbd> {t('search.hintNav')} · <kbd>Enter</kbd> {t('search.hintPick')} · <kbd>Esc</kbd> {t('search.hintClose')}
         </div>
       )}
     </div>
@@ -195,10 +197,11 @@ function Highlight({ text, query }: { text: string; query: string }) {
 }
 
 function StatusBadge({ status }: { status: Task['status'] }) {
+  const { t } = useI18n();
   const map = {
-    done: { bg: '#10b981', label: 'Done' },
-    'in-progress': { bg: '#6366f1', label: 'Active' },
-    planned: { bg: 'transparent', label: 'Planned' },
+    done: { bg: '#10b981', label: t('status.done') },
+    'in-progress': { bg: '#6366f1', label: t('search.badgeActive') },
+    planned: { bg: 'transparent', label: t('status.planned') },
   } as const;
   const s = map[status];
   return (

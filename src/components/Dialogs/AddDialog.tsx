@@ -4,6 +4,8 @@ import { Dispatch, useEffect, useState, useRef, useCallback } from 'react';
 import { GanttState, GanttAction, Task } from '@/types';
 import { genId, formatISO } from '@/lib/dateUtils';
 import { MS_COLORS } from '@/data/defaultProject';
+import { useI18n } from '@/i18n/I18nProvider';
+import type { TFunction } from '@/i18n/I18nProvider';
 
 interface AddDialogProps {
   state: GanttState;
@@ -12,6 +14,7 @@ interface AddDialogProps {
 }
 
 export default function AddDialog({ state, dispatch }: AddDialogProps) {
+  const { t } = useI18n();
   const dialog = state.activeDialog;
 
   // Form fields
@@ -94,7 +97,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         const newTask: Task = {
           id: genId(),
           phase: `${phaseName.trim() || 'Phase'} ${sub}`,
-          name: taskName.trim() || 'New Task',
+          name: taskName.trim() || t('default.newTask'),
           duration: Math.max(1, duration),
           status: 'planned',
           isCritical: false,
@@ -118,7 +121,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         const newTask: Task = {
           id: genId(),
           phase: `${masterPhase} ${subPhaseName.trim() || 'General'}`,
-          name: taskName.trim() || 'New Task',
+          name: taskName.trim() || t('default.newTask'),
           duration: Math.max(1, duration),
           status: 'planned',
           isCritical: false,
@@ -156,7 +159,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         const newTask: Task = {
           id: genId(),
           phase: fullPhase,
-          name: taskName.trim() || 'New Task',
+          name: taskName.trim() || t('default.newTask'),
           duration: Math.max(1, duration),
           status: 'planned',
           isCritical: false,
@@ -174,7 +177,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         const newTask: Task = {
           id: genId(),
           phase: targetTask?.phase || '',
-          name: taskName.trim() || 'New Task',
+          name: taskName.trim() || t('default.newTask'),
           duration: Math.max(1, duration),
           status: 'planned',
           isCritical: false,
@@ -189,7 +192,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         const newTask: Task = {
           id: genId(),
           phase: phase || '',
-          name: taskName.trim() || 'New Task',
+          name: taskName.trim() || t('default.newTask'),
           duration: Math.max(1, duration),
           status: 'planned',
           isCritical: false,
@@ -248,7 +251,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
     }
 
     dispatch({ type: 'CLOSE_DIALOG' });
-  }, [dialog, phaseName, subPhaseName, taskName, duration, milestoneName, milestoneDate, state.tasks, state.milestones, dispatch, findLastTaskId, findLastTaskIndex]);
+  }, [dialog, phaseName, subPhaseName, taskName, duration, milestoneName, milestoneDate, state.tasks, state.milestones, dispatch, findLastTaskId, findLastTaskIndex, t]);
 
   const handleDelete = useCallback(() => {
     if (!dialog) return;
@@ -286,7 +289,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
   if (!dialog) return null;
 
   // Determine dialog title and icon
-  const dialogConfig = getDialogConfig(dialog.type);
+  const dialogConfig = getDialogConfig(dialog.type, t);
   const showDeleteButton = dialog.type === 'edit-phase' || dialog.type === 'edit-sub-phase' || dialog.type === 'edit-milestone';
 
   return (
@@ -324,7 +327,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
                 onClick={handleDelete}
                 type="button"
               >
-                Delete
+                {t('common.delete')}
               </button>
             )}
           </div>
@@ -334,7 +337,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
               onClick={handleClose}
               type="button"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               className="btn-primary text-xs font-semibold px-5 py-2 rounded-lg cursor-pointer"
@@ -354,35 +357,35 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
       case 'add-phase':
         return (
           <>
-            <FieldGroup label="Phase Name">
+            <FieldGroup label={t('field.phaseName')}>
               <input
                 ref={firstInputRef}
                 type="text"
                 className="input-field"
-                placeholder="e.g. Phase 10"
+                placeholder={t('ph.phase')}
                 value={phaseName}
                 onChange={(e) => setPhaseName(e.target.value)}
               />
             </FieldGroup>
-            <FieldGroup label="First Sub-Phase Name">
+            <FieldGroup label={t('field.firstSubPhase')}>
               <input
                 type="text"
                 className="input-field"
-                placeholder="e.g. Setup"
+                placeholder={t('ph.setup')}
                 value={subPhaseName}
                 onChange={(e) => setSubPhaseName(e.target.value)}
               />
             </FieldGroup>
-            <FieldGroup label="First Task Name">
+            <FieldGroup label={t('field.firstTask')}>
               <input
                 type="text"
                 className="input-field"
-                placeholder="e.g. Initial setup"
+                placeholder={t('ph.initialSetup')}
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
               />
             </FieldGroup>
-            <FieldGroup label="Duration (days)">
+            <FieldGroup label={t('field.duration')}>
               <input
                 type="number"
                 className="input-field"
@@ -397,26 +400,26 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
       case 'add-sub-phase':
         return (
           <>
-            <FieldGroup label="Sub-Phase Name">
+            <FieldGroup label={t('field.subPhaseName')}>
               <input
                 ref={firstInputRef}
                 type="text"
                 className="input-field"
-                placeholder="e.g. Testing"
+                placeholder={t('ph.testing')}
                 value={subPhaseName}
                 onChange={(e) => setSubPhaseName(e.target.value)}
               />
             </FieldGroup>
-            <FieldGroup label="First Task Name">
+            <FieldGroup label={t('field.firstTask')}>
               <input
                 type="text"
                 className="input-field"
-                placeholder="e.g. Write test cases"
+                placeholder={t('ph.writeTests')}
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
               />
             </FieldGroup>
-            <FieldGroup label="Duration (days)">
+            <FieldGroup label={t('field.duration')}>
               <input
                 type="number"
                 className="input-field"
@@ -433,17 +436,17 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
       case 'add-after-task':
         return (
           <>
-            <FieldGroup label="Task Name">
+            <FieldGroup label={t('field.taskName')}>
               <input
                 ref={firstInputRef}
                 type="text"
                 className="input-field"
-                placeholder="e.g. Implement feature"
+                placeholder={t('ph.implement')}
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
               />
             </FieldGroup>
-            <FieldGroup label="Duration (days)">
+            <FieldGroup label={t('field.duration')}>
               <input
                 type="number"
                 className="input-field"
@@ -457,7 +460,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
 
       case 'edit-phase':
         return (
-          <FieldGroup label="Phase Name">
+          <FieldGroup label={t('field.phaseName')}>
             <input
               ref={firstInputRef}
               type="text"
@@ -470,7 +473,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
 
       case 'edit-sub-phase':
         return (
-          <FieldGroup label="Sub-Phase Name">
+          <FieldGroup label={t('field.subPhaseName')}>
             <input
               ref={firstInputRef}
               type="text"
@@ -484,17 +487,17 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
       case 'add-milestone':
         return (
           <>
-            <FieldGroup label="Milestone Name">
+            <FieldGroup label={t('field.milestoneName')}>
               <input
                 ref={firstInputRef}
                 type="text"
                 className="input-field"
-                placeholder="e.g. Beta Release"
+                placeholder={t('ph.betaRelease')}
                 value={milestoneName}
                 onChange={(e) => setMilestoneName(e.target.value)}
               />
             </FieldGroup>
-            <FieldGroup label="Date">
+            <FieldGroup label={t('field.date')}>
               <input
                 type="date"
                 className="input-field"
@@ -508,7 +511,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
       case 'edit-milestone':
         return (
           <>
-            <FieldGroup label="Milestone Name">
+            <FieldGroup label={t('field.milestoneName')}>
               <input
                 ref={firstInputRef}
                 type="text"
@@ -517,7 +520,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
                 onChange={(e) => setMilestoneName(e.target.value)}
               />
             </FieldGroup>
-            <FieldGroup label="Date">
+            <FieldGroup label={t('field.date')}>
               <input
                 type="date"
                 className="input-field"
@@ -545,27 +548,27 @@ function FieldGroup({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-function getDialogConfig(type: string): { title: string; icon: string; iconBg: string; submitLabel: string } {
+function getDialogConfig(type: string, t: TFunction): { title: string; icon: string; iconBg: string; submitLabel: string } {
   switch (type) {
     case 'add-phase':
-      return { title: 'Add New Phase', icon: '+', iconBg: 'linear-gradient(135deg, #6366f1, #8b5cf6)', submitLabel: 'Add Phase' };
+      return { title: t('dialog.addPhase.title'), icon: '+', iconBg: 'linear-gradient(135deg, #6366f1, #8b5cf6)', submitLabel: t('dialog.addPhase.submit') };
     case 'add-sub-phase':
-      return { title: 'Add Sub-Phase', icon: '+', iconBg: 'linear-gradient(135deg, #6366f1, #8b5cf6)', submitLabel: 'Add Sub-Phase' };
+      return { title: t('dialog.addSubPhase.title'), icon: '+', iconBg: 'linear-gradient(135deg, #6366f1, #8b5cf6)', submitLabel: t('dialog.addSubPhase.submit') };
     case 'add-task':
-      return { title: 'Add Task', icon: '+', iconBg: 'linear-gradient(135deg, #3b82f6, #6366f1)', submitLabel: 'Add Task' };
+      return { title: t('dialog.addTask.title'), icon: '+', iconBg: 'linear-gradient(135deg, #3b82f6, #6366f1)', submitLabel: t('dialog.addTask.submit') };
     case 'add-before-task':
-      return { title: 'Insert Task Before', icon: '+', iconBg: 'linear-gradient(135deg, #3b82f6, #6366f1)', submitLabel: 'Insert Task' };
+      return { title: t('dialog.addBefore.title'), icon: '+', iconBg: 'linear-gradient(135deg, #3b82f6, #6366f1)', submitLabel: t('dialog.insertSubmit') };
     case 'add-after-task':
-      return { title: 'Insert Task After', icon: '+', iconBg: 'linear-gradient(135deg, #3b82f6, #6366f1)', submitLabel: 'Insert Task' };
+      return { title: t('dialog.addAfter.title'), icon: '+', iconBg: 'linear-gradient(135deg, #3b82f6, #6366f1)', submitLabel: t('dialog.insertSubmit') };
     case 'edit-phase':
-      return { title: 'Edit Phase', icon: '\u270E', iconBg: 'linear-gradient(135deg, #f59e0b, #ef4444)', submitLabel: 'Save Changes' };
+      return { title: t('dialog.editPhase.title'), icon: '\u270E', iconBg: 'linear-gradient(135deg, #f59e0b, #ef4444)', submitLabel: t('dialog.saveChanges') };
     case 'edit-sub-phase':
-      return { title: 'Edit Sub-Phase', icon: '\u270E', iconBg: 'linear-gradient(135deg, #f59e0b, #ef4444)', submitLabel: 'Save Changes' };
+      return { title: t('dialog.editSubPhase.title'), icon: '\u270E', iconBg: 'linear-gradient(135deg, #f59e0b, #ef4444)', submitLabel: t('dialog.saveChanges') };
     case 'add-milestone':
-      return { title: 'Add Milestone', icon: '\u25C6', iconBg: 'linear-gradient(135deg, #10b981, #14b8a6)', submitLabel: 'Add Milestone' };
+      return { title: t('dialog.addMilestone.title'), icon: '\u25C6', iconBg: 'linear-gradient(135deg, #10b981, #14b8a6)', submitLabel: t('dialog.addMilestone.submit') };
     case 'edit-milestone':
-      return { title: 'Edit Milestone', icon: '\u25C6', iconBg: 'linear-gradient(135deg, #10b981, #14b8a6)', submitLabel: 'Save Changes' };
+      return { title: t('dialog.editMilestone.title'), icon: '\u25C6', iconBg: 'linear-gradient(135deg, #10b981, #14b8a6)', submitLabel: t('dialog.saveChanges') };
     default:
-      return { title: 'Dialog', icon: '?', iconBg: '#666', submitLabel: 'Submit' };
+      return { title: t('dialog.generic.title'), icon: '?', iconBg: '#666', submitLabel: t('dialog.generic.submit') };
   }
 }

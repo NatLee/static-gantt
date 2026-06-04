@@ -2,36 +2,39 @@
 
 import { useEffect } from 'react';
 import { Keyboard, MousePointer2, Save, Split, X } from 'lucide-react';
+import { useI18n } from '@/i18n/I18nProvider';
+import type { MessageKey } from '@/i18n/messages';
 
 interface Props {
   onClose: () => void;
   onOpenShortcuts: () => void;
 }
 
-const FEATURES = [
+const FEATURES: { icon: React.ReactNode; titleKey: MessageKey; bodyKey: MessageKey }[] = [
   {
     icon: <MousePointer2 className="w-4 h-4" />,
-    title: 'Drag to edit',
-    body: 'Drag a task bar to move dates or reorder across sub-phases. Drag the right edge to resize. Right-click a task for duplicate / delete / status.',
+    titleKey: 'welcome.dragTitle',
+    bodyKey: 'welcome.dragBody',
   },
   {
     icon: <Split className="w-4 h-4" />,
-    title: 'Connect dependencies',
-    body: 'Drag from a task bar to another to create a dependency. The line turns red when it would cause a cycle.',
+    titleKey: 'welcome.connectTitle',
+    bodyKey: 'welcome.connectBody',
   },
   {
     icon: <Save className="w-4 h-4" />,
-    title: 'Multi-project + auto-save',
-    body: 'File menu → New / Open / Download / Import. Everything saves to localStorage automatically — no data loss on refresh.',
+    titleKey: 'welcome.saveTitle',
+    bodyKey: 'welcome.saveBody',
   },
   {
     icon: <Keyboard className="w-4 h-4" />,
-    title: 'Keyboard shortcuts',
-    body: 'Cmd/Ctrl+Z to undo, Cmd/Ctrl+F to search, T to jump to today, +/- to zoom. Press ? anywhere to see the full cheatsheet.',
+    titleKey: 'welcome.kbdTitle',
+    bodyKey: 'welcome.kbdBody',
   },
 ];
 
 export default function WelcomeDialog({ onClose, onOpenShortcuts }: Props) {
+  const { t } = useI18n();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === 'Enter') {
@@ -50,17 +53,17 @@ export default function WelcomeDialog({ onClose, onOpenShortcuts }: Props) {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-              Welcome 👋
+              {t('welcome.title')}
             </h3>
             <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              A quick tour of what's in here
+              {t('welcome.subtitle')}
             </p>
           </div>
           <button
             className="btn-glass rounded-md p-1 cursor-pointer"
             onClick={onClose}
             type="button"
-            title="Close"
+            title={t('common.close')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -68,7 +71,7 @@ export default function WelcomeDialog({ onClose, onOpenShortcuts }: Props) {
 
         <div className="flex flex-col gap-3 mt-2">
           {FEATURES.map((f) => (
-            <div key={f.title} className="flex gap-3 items-start">
+            <div key={f.titleKey} className="flex gap-3 items-start">
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                 style={{
@@ -83,13 +86,13 @@ export default function WelcomeDialog({ onClose, onOpenShortcuts }: Props) {
                   className="text-xs font-bold mb-0.5"
                   style={{ color: 'var(--text-primary)' }}
                 >
-                  {f.title}
+                  {t(f.titleKey)}
                 </div>
                 <div
                   className="text-[11px] leading-snug"
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  {f.body}
+                  {t(f.bodyKey)}
                 </div>
               </div>
             </div>
@@ -105,14 +108,14 @@ export default function WelcomeDialog({ onClose, onOpenShortcuts }: Props) {
             }}
             type="button"
           >
-            Show all shortcuts
+            {t('welcome.showShortcuts')}
           </button>
           <button
             className="btn-primary text-xs font-semibold px-5 py-2 rounded-lg cursor-pointer"
             onClick={onClose}
             type="button"
           >
-            Let&apos;s go
+            {t('welcome.letsGo')}
           </button>
         </div>
       </div>

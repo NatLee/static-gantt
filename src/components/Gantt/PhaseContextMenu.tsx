@@ -4,6 +4,7 @@ import { Dispatch, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Edit, FolderMinus, FolderPlus, Plus, Trash2 } from 'lucide-react';
 import { GanttAction } from '@/types';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface Props {
   kind: 'phase' | 'sub-phase';
@@ -26,6 +27,7 @@ export default function PhaseContextMenu({
   dispatch,
   onClose,
 }: Props) {
+  const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y, measured: false });
 
@@ -144,31 +146,31 @@ export default function PhaseContextMenu({
         className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider truncate"
         style={{ color: 'var(--text-secondary)' }}
       >
-        {kind === 'phase' ? 'Phase' : 'Sub-phase'} · {label}
+        {kind === 'phase' ? t('pctx.phase') : t('pctx.subPhase')} · {label}
       </div>
       <Divider />
-      <Item icon={<Edit className="w-3 h-3" />} label="Rename..." onClick={handleRename} />
+      <Item icon={<Edit className="w-3 h-3" />} label={t('pctx.rename')} onClick={handleRename} />
       {kind === 'phase' && (
         <Item
           icon={<FolderPlus className="w-3 h-3" />}
-          label="Add sub-phase..."
+          label={t('pctx.addSubPhase')}
           onClick={handleAddSubPhase}
         />
       )}
       <Item
         icon={<Plus className="w-3 h-3" />}
-        label="Add task..."
+        label={t('pctx.addTask')}
         onClick={handleAddTask}
       />
       <Item
         icon={<FolderMinus className="w-3 h-3" />}
-        label={isCollapsed ? 'Expand' : 'Collapse'}
+        label={isCollapsed ? t('pctx.expand') : t('pctx.collapse')}
         onClick={handleCollapse}
       />
       <Divider />
       <Item
         icon={<Trash2 className="w-3 h-3" />}
-        label="Delete"
+        label={t('pctx.delete')}
         onClick={handleDelete}
         danger
       />

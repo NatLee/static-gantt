@@ -15,6 +15,7 @@ import { formatMermaid } from '@/lib/mermaidFormat';
 import CodeMirror from '@uiw/react-codemirror';
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { mermaidLanguage } from '@/lib/codemirror/mermaidLang';
+import { useI18n } from '@/i18n/I18nProvider';
 
 export interface MermaidPanelHandle {
   getCode: () => string;
@@ -34,6 +35,7 @@ interface MermaidPanelProps {
 
 const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
   function MermaidPanel({ state }, ref) {
+    const { t } = useI18n();
     const [code, setCode] = useState(() => generateMermaidFromData(state.tasks));
     const [svgContent, setSvgContent] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -437,7 +439,7 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
               <polyline points="8 6 2 12 8 18" />
             </svg>
             <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Mermaid Editor
+              {t('mermaid.editor')}
             </span>
           </div>
 
@@ -497,13 +499,13 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
             style={{ borderColor: 'var(--border-color)', background: 'var(--bg-card)' }}
           >
             <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Preview
+              {t('mermaid.preview')}
             </span>
             <div className="flex items-center gap-2">
               <button
                 className="btn-glass text-[11px] font-bold px-2 py-0.5 rounded cursor-pointer"
                 onClick={handleZoomOut}
-                title="Zoom out"
+                title={t('mermaid.zoomOut')}
               >
                 -
               </button>
@@ -513,16 +515,16 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
               <button
                 className="btn-glass text-[11px] font-bold px-2 py-0.5 rounded cursor-pointer"
                 onClick={handleZoomIn}
-                title="Zoom in"
+                title={t('mermaid.zoomIn')}
               >
                 +
               </button>
               <button
                 className="btn-glass text-[11px] font-semibold px-2.5 py-0.5 rounded cursor-pointer"
                 onClick={handleFit}
-                title="Reset view"
+                title={t('mermaid.resetView')}
               >
-                Fit
+                {t('mermaid.fit')}
               </button>
             </div>
           </div>
@@ -549,7 +551,7 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
                 <div dangerouslySetInnerHTML={{ __html: svgContent }} />
               ) : !error ? (
                 <div className="flex items-center justify-center p-8" style={{ color: 'var(--text-secondary)' }}>
-                  <span className="text-sm">Rendering diagram...</span>
+                  <span className="text-sm">{t('mermaid.rendering')}</span>
                 </div>
               ) : null}
             </div>
@@ -565,7 +567,7 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
                   maxHeight: '30%',
                 }}
               >
-                <div className="font-semibold mb-1">Render Error</div>
+                <div className="font-semibold mb-1">{t('mermaid.renderError')}</div>
                 <pre className="whitespace-pre-wrap break-words">{error}</pre>
               </div>
             )}

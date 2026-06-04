@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ZoomIn, ZoomOut } from 'lucide-react';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface GanttCornerProps {
   onZoomIn: () => void;
@@ -9,6 +10,7 @@ interface GanttCornerProps {
 }
 
 export default function GanttCorner({ onZoomIn, onZoomOut }: GanttCornerProps) {
+  const { t } = useI18n();
   return (
     <div
       style={{
@@ -31,7 +33,7 @@ export default function GanttCorner({ onZoomIn, onZoomOut }: GanttCornerProps) {
           textTransform: 'uppercase',
         }}
       >
-        Task Structure
+        {t('corner.taskStructure')}
       </span>
       <div style={{ display: 'flex', gap: 4 }}>
         <button
@@ -47,7 +49,7 @@ export default function GanttCorner({ onZoomIn, onZoomOut }: GanttCornerProps) {
             padding: 0,
           }}
           onClick={onZoomOut}
-          title="Zoom Out"
+          title={t('corner.zoomOut')}
         >
           <ZoomOut size={14} />
         </button>
@@ -64,7 +66,7 @@ export default function GanttCorner({ onZoomIn, onZoomOut }: GanttCornerProps) {
             padding: 0,
           }}
           onClick={onZoomIn}
-          title="Zoom In"
+          title={t('corner.zoomIn')}
         >
           <ZoomIn size={14} />
         </button>

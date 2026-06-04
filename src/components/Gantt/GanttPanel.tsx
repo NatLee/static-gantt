@@ -17,6 +17,7 @@ import { useResizableSidebar } from '@/hooks/useResizableSidebar';
 import { useVirtualRows } from '@/hooks/useVirtualRows';
 import { useDragToConnect } from '@/hooks/useDragToConnect';
 import { buildDepPath, buildArrowHead } from '@/lib/depPath';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface GanttPanelProps {
   state: GanttState;
@@ -94,6 +95,7 @@ export default function GanttPanel({
   hierarchy,
   taskMap,
 }: GanttPanelProps) {
+  const { t } = useI18n();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const exportTargetRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -457,7 +459,7 @@ export default function GanttPanel({
                   zIndex: Z.overlay + 1,
                 }}
               >
-                無法建立：會造成循環依賴
+                {t('gantt.cycleBlocked')}
               </div>
             )}
           </div>
