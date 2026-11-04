@@ -18,51 +18,36 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
   const { t } = useI18n();
   const dialog = state.activeDialog;
 
-  // Form fields
-  const [phaseName, setPhaseName] = useState('');
-  const [subPhaseName, setSubPhaseName] = useState('');
+  // Form fields. GanttApp mounts a fresh AddDialog (new `key`) for every dialog it opens, so
+  // these start from the dialog's context; edit dialogs are pre-filled with the current values.
+  // The edit-milestone trigger only passes { milestoneId }, so the milestone is looked up to
+  // pre-fill its name and date (otherwise "Save" with empty fields silently no-ops).
+  const editedMilestone =
+    dialog?.type === 'edit-milestone'
+      ? state.milestones.find(m => m.id === dialog.context.milestoneId)
+      : undefined;
+  const [phaseName, setPhaseName] = useState(() =>
+    dialog?.type === 'edit-phase' ? dialog.context.phase || dialog.context.masterPhase || '' : ''
+  );
+  const [subPhaseName, setSubPhaseName] = useState(() =>
+    dialog?.type === 'edit-sub-phase' ? dialog.context.subPhase || '' : ''
+  );
   const [taskName, setTaskName] = useState('');
   const [duration, setDuration] = useState(5);
-  const [milestoneName, setMilestoneName] = useState('');
-  const [milestoneDate, setMilestoneDate] = useState('');
+  const [milestoneName, setMilestoneName] = useState(() =>
+    dialog?.type === 'edit-milestone' ? dialog.context.name || editedMilestone?.name || '' : ''
+  );
+  const [milestoneDate, setMilestoneDate] = useState(() =>
+    dialog?.type === 'edit-milestone' ? dialog.context.date || editedMilestone?.date || '' : ''
+  );
 
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset form when dialog changes
+  // Focus the first field once the dialog has rendered.
   useEffect(() => {
-    if (!dialog) return;
-
-    setPhaseName('');
-    setSubPhaseName('');
-    setTaskName('');
-    setDuration(5);
-    setMilestoneName('');
-    setMilestoneDate('');
-
-    // Pre-populate for edit dialogs
-    if (dialog.type === 'edit-phase' && (dialog.context.phase || dialog.context.masterPhase)) {
-      setPhaseName(dialog.context.phase || dialog.context.masterPhase);
-    }
-    if (dialog.type === 'edit-sub-phase' && dialog.context.subPhase) {
-      setSubPhaseName(dialog.context.subPhase);
-    }
-    if (dialog.type === 'edit-milestone') {
-      // The edit trigger only passes { milestoneId }, so look the milestone up
-      // from state to pre-fill the current name/date (otherwise both fields
-      // open blank and a "Save" with empty fields silently no-ops).
-      const ms = state.milestones.find(m => m.id === dialog.context.milestoneId);
-      setMilestoneName(dialog.context.name || ms?.name || '');
-      setMilestoneDate(dialog.context.date || ms?.date || '');
-    }
-
-    // Auto-focus first input
-    setTimeout(() => {
-      firstInputRef.current?.focus();
-    }, 50);
-    // Intentionally only re-run when the dialog identity changes; we snapshot
-    // milestones at open time and must not reset fields on later state changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dialog]);
+    const timer = setTimeout(() => firstInputRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleClose = useCallback(() => {
     dispatch({ type: 'CLOSE_DIALOG' });

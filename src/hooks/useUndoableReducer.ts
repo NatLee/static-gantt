@@ -1,4 +1,4 @@
-import { Dispatch, Reducer, useCallback, useReducer, useRef } from 'react';
+import { Dispatch, Reducer, useCallback, useReducer } from 'react';
 
 export interface UndoableHistory {
   canUndo: boolean;
@@ -8,62 +8,53 @@ export interface UndoableHistory {
   reset: () => void;
 }
 
-interface Options<A> {
+export interface UndoableOptions<A> {
+  /** Actions that change the document go on the undo stack; view changes (zoom, dialogs) don't. */
   isUndoable: (action: A) => boolean;
-  maxHistory?: number;
+  maxHistory: number;
 }
 
-interface Internal<S> {
+export interface History<S> {
   past: S[];
   present: S;
   future: S[];
 }
 
-type Meta<A> = A | { type: '__UNDO__' } | { type: '__REDO__' } | { type: '__RESET_HISTORY__' };
+type HistoryAction<A> = A | { type: '__UNDO__' } | { type: '__REDO__' } | { type: '__RESET_HISTORY__' };
 
-export function useUndoableReducer<S, A extends { type: string }>(
+/** Wrap a reducer with undo/redo. Pure, so it can be built once at module level and tested. */
+export function undoable<S, A extends { type: string }>(
   reducer: Reducer<S, A>,
-  initialState: S,
-  options: Options<A>
+  { isUndoable, maxHistory }: UndoableOptions<A>
+): Reducer<History<S>, HistoryAction<A>> {
+  return (s, action) => {
+    if (action.type === '__UNDO__') {
+      if (s.past.length === 0) return s;
+      return { past: s.past.slice(0, -1), present: s.past[s.past.length - 1], future: [s.present, ...s.future] };
+    }
+    if (action.type === '__REDO__') {
+      if (s.future.length === 0) return s;
+      const [next, ...rest] = s.future;
+      return { past: [...s.past, s.present], present: next, future: rest };
+    }
+    if (action.type === '__RESET_HISTORY__') {
+      return { past: [], present: s.present, future: [] };
+    }
+    const a = action as A;
+    const nextPresent = reducer(s.present, a);
+    if (nextPresent === s.present) return s;
+    if (!isUndoable(a)) return { ...s, present: nextPresent };
+    const past = [...s.past, s.present].slice(-maxHistory);
+    return { past, present: nextPresent, future: [] };
+  };
+}
+
+/** useReducer over a reducer built with `undoable`. */
+export function useUndoableReducer<S, A extends { type: string }>(
+  reducer: Reducer<History<S>, HistoryAction<A>>,
+  initialState: S
 ): [S, Dispatch<A>, UndoableHistory] {
-  const { maxHistory = 50 } = options;
-  const optsRef = useRef(options);
-  optsRef.current = options;
-
-  const wrapped = useCallback(
-    (s: Internal<S>, action: Meta<A>): Internal<S> => {
-      if (action.type === '__UNDO__') {
-        if (s.past.length === 0) return s;
-        const previous = s.past[s.past.length - 1];
-        const past = s.past.slice(0, -1);
-        return { past, present: previous, future: [s.present, ...s.future] };
-      }
-      if (action.type === '__REDO__') {
-        if (s.future.length === 0) return s;
-        const [next, ...rest] = s.future;
-        return { past: [...s.past, s.present], present: next, future: rest };
-      }
-      if (action.type === '__RESET_HISTORY__') {
-        return { past: [], present: s.present, future: [] };
-      }
-      const a = action as A;
-      const nextPresent = reducer(s.present, a);
-      if (nextPresent === s.present) return s;
-      if (!optsRef.current.isUndoable(a)) {
-        return { ...s, present: nextPresent };
-      }
-      const past = [...s.past, s.present];
-      if (past.length > maxHistory) past.shift();
-      return { past, present: nextPresent, future: [] };
-    },
-    [reducer, maxHistory]
-  );
-
-  const [internal, rawDispatch] = useReducer(wrapped, {
-    past: [],
-    present: initialState,
-    future: [],
-  });
+  const [internal, rawDispatch] = useReducer(reducer, { past: [], present: initialState, future: [] });
 
   const dispatch = useCallback((action: A) => rawDispatch(action), []);
   const undo = useCallback(() => rawDispatch({ type: '__UNDO__' }), []);

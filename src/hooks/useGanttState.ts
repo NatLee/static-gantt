@@ -5,7 +5,7 @@ import { computeSchedule, buildHierarchy, computeTimelineBounds, annotateWorkloa
 import { rewireDependencies } from '@/lib/dependencyRewire';
 import { joinPhase, masterOf, splitPhase } from '@/lib/phase';
 import { formatAfter, parseAfter } from '@/lib/dependencies';
-import { useUndoableReducer } from './useUndoableReducer';
+import { undoable, useUndoableReducer } from './useUndoableReducer';
 
 const initialBounds = computeTimelineBounds(computeSchedule(defaultTasks), defaultMilestones);
 
@@ -441,16 +441,16 @@ const NON_UNDOABLE_ACTIONS = new Set<GanttAction['type']>([
   'SET_WORKING_DAYS',
 ]);
 
-function isUndoable(action: GanttAction): boolean {
-  return !NON_UNDOABLE_ACTIONS.has(action.type);
-}
+/** Undo keeps this many steps. */
+const MAX_UNDO_STEPS = 50;
+
+export const undoableGanttReducer = undoable(ganttReducer, {
+  isUndoable: action => !NON_UNDOABLE_ACTIONS.has(action.type),
+  maxHistory: MAX_UNDO_STEPS,
+});
 
 export function useGanttState() {
-  const [state, dispatch, history] = useUndoableReducer(
-    ganttReducer,
-    initialState,
-    { isUndoable, maxHistory: 50 }
-  );
+  const [state, dispatch, history] = useUndoableReducer(undoableGanttReducer, initialState);
 
   const computed = useMemo<ComputedTask[]>(
     () => annotateWorkload(computeSchedule(state.tasks, { workingDaysOnly: state.workingDaysOnly })),

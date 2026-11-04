@@ -67,10 +67,12 @@ export function usePersistentGanttState() {
     savedStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), SAVED_BADGE_MS);
   }, []);
 
-  // Initial load from localStorage (client only)
+  // Initial load from localStorage. This has to run after mount: the page is prebuilt without
+  // access to the browser storage, and the first client render must match that HTML.
   useEffect(() => {
     const loaded = loadAppStorage();
     storageRef.current = loaded;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from localStorage once after mount
     setStorage(loaded);
 
     const active = findActiveProject(loaded);

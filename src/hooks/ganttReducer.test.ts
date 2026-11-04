@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ganttReducer } from './useGanttState';
+import { ganttReducer, undoableGanttReducer } from './useGanttState';
 import type { GanttState, Task } from '@/types';
+import type { History } from './useUndoableReducer';
 import { task } from '@/test/helpers';
 
 const stateWith = (tasks: Task[]): GanttState => ({
@@ -151,5 +152,33 @@ describe('ganttReducer: phases without a "Phase N" prefix', () => {
   it('RENAME_PHASE of Other gives its sections a numbered prefix', () => {
     const s = ganttReducer(stateWith(tasks), { type: 'RENAME_PHASE', oldName: 'Other', newName: 'Phase 2' });
     expect(s.tasks.map(t => t.phase)).toEqual(['Phase 2 Marketing', 'Phase 1 Plan', 'Phase 2 Sales']);
+  });
+});
+
+describe('undo / redo', () => {
+  const history = (tasks: Task[]): History<GanttState> => ({ past: [], present: stateWith(tasks), future: [] });
+
+  it('undoes and redoes document edits', () => {
+    let h = history([task('a', { start: '2026-03-01' })]);
+    h = undoableGanttReducer(h, { type: 'RESIZE_TASK', taskId: 'a', newDuration: 5 });
+    expect(h.present.tasks[0].duration).toBe(5);
+    h = undoableGanttReducer(h, { type: '__UNDO__' });
+    expect(h.present.tasks[0].duration).toBe(1);
+    h = undoableGanttReducer(h, { type: '__REDO__' });
+    expect(h.present.tasks[0].duration).toBe(5);
+  });
+
+  it('does not put view changes on the undo stack', () => {
+    let h = history([task('a')]);
+    h = undoableGanttReducer(h, { type: 'SET_ZOOM', scale: 2 });
+    expect(h.past).toHaveLength(0);
+    expect(h.present.zoomScale).toBe(2);
+  });
+
+  it('keeps at most 50 steps', () => {
+    let h = history([task('a', { start: '2026-03-01' })]);
+    for (let i = 2; i <= 60; i++) h = undoableGanttReducer(h, { type: 'RESIZE_TASK', taskId: 'a', newDuration: i });
+    expect(h.past).toHaveLength(50);
+    expect(h.past[0].tasks[0].duration).toBe(10);
   });
 });

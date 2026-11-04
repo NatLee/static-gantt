@@ -1,20 +1,19 @@
 'use client';
 
-import { Dispatch, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
-import { GanttAction, Task } from '@/types';
+import { Task } from '@/types';
 import { useI18n } from '@/i18n/I18nProvider';
 
 interface Props {
   tasks: Task[];
-  dispatch: Dispatch<GanttAction>;
   onClose: () => void;
   onPick: (taskId: string) => void;
 }
 
 const MAX_RESULTS = 10;
 
-export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props) {
+export default function SearchPanel({ tasks, onClose, onPick }: Props) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -46,9 +45,8 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
     return matches.slice(0, MAX_RESULTS).map(m => m.task);
   }, [query, tasks]);
 
-  useEffect(() => {
-    if (selectedIndex >= results.length) setSelectedIndex(0);
-  }, [results.length, selectedIndex]);
+  // The highlighted row, kept inside the current results when they shrink.
+  const active = selectedIndex < results.length ? selectedIndex : 0;
 
   const pick = useCallback(
     (task: Task) => {
@@ -79,11 +77,11 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
       }
       if (e.key === 'Enter') {
         e.preventDefault();
-        const t = results[selectedIndex];
+        const t = results[active];
         if (t) pick(t);
       }
     },
-    [results, selectedIndex, pick, onClose]
+    [results, active, pick, onClose]
   );
 
   return (
@@ -103,7 +101,10 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
         <input
           ref={inputRef}
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => {
+            setQuery(e.target.value);
+            setSelectedIndex(0);
+          }}
           onKeyDown={handleKeyDown}
           placeholder={t('search.placeholder')}
           className="flex-1 bg-transparent outline-none text-sm"
@@ -134,9 +135,9 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
                 key={task.id}
                 className="w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer transition-colors"
                 style={{
-                  background: i === selectedIndex ? 'var(--accent-glow)' : 'transparent',
+                  background: i === active ? 'var(--accent-glow)' : 'transparent',
                   color: 'var(--text-primary)',
-                  borderLeft: `3px solid ${i === selectedIndex ? 'var(--accent)' : 'transparent'}`,
+                  borderLeft: `3px solid ${i === active ? 'var(--accent)' : 'transparent'}`,
                 }}
                 onClick={() => pick(task)}
                 onMouseEnter={() => setSelectedIndex(i)}

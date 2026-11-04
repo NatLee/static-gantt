@@ -34,6 +34,17 @@ const MermaidPanel = dynamic(() => import('@/components/Mermaid/MermaidPanel'), 
   ssr: false,
 });
 
+/** localStorage flag set once the welcome dialog has been dismissed. */
+const WELCOME_SEEN_KEY = 'gantt-welcome-seen';
+
+function hasSeenWelcome(): boolean {
+  try {
+    return !!localStorage.getItem(WELCOME_SEEN_KEY);
+  } catch {
+    return true; // storage unavailable: don't nag on every visit
+  }
+}
+
 export default function GanttApp() {
   const {
     state,
@@ -58,30 +69,22 @@ export default function GanttApp() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  // First-visit welcome, shown once ever. Read only after saved data has loaded (the prebuilt
+  // page has no localStorage), so the first render matches the static HTML.
+  const welcomeOpen = hydrated && !welcomeDismissed && !hasSeenWelcome();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', state.isDark ? 'dark' : 'light');
   }, [state.isDark]);
 
-  // First-visit welcome: flag stored once-ever, never shown again after dismiss
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem('gantt-welcome-seen')) {
-        setWelcomeOpen(true);
-      }
-    } catch {
-      // localStorage unavailable, skip
-    }
-  }, []);
-
   const handleCloseWelcome = useCallback(() => {
     try {
-      localStorage.setItem('gantt-welcome-seen', '1');
+      localStorage.setItem(WELCOME_SEEN_KEY, '1');
     } catch {
-      // ignore
+      // ignore: the dialog just shows again next time
     }
-    setWelcomeOpen(false);
+    setWelcomeDismissed(true);
   }, []);
 
   const handleLoadSample = useCallback(() => {
@@ -289,6 +292,7 @@ export default function GanttApp() {
 
       {state.activeDialog !== null && (
         <AddDialog
+          key={`${state.activeDialog.type}:${JSON.stringify(state.activeDialog.context)}`}
           state={state}
           dispatch={dispatch}
           masterPhases={masterPhases}
@@ -313,7 +317,6 @@ export default function GanttApp() {
       {searchOpen && state.currentMode === 'visual' && (
         <SearchPanel
           tasks={state.tasks}
-          dispatch={dispatch}
           onClose={handleCloseSearch}
           onPick={handlePickSearchResult}
         />

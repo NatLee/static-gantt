@@ -1,5 +1,4 @@
 /** Characters Windows, macOS or Linux do not allow in file names, plus control characters. */
-// eslint-disable-next-line no-control-regex
 const UNSAFE_FILENAME_CHARS = /[\\/:*?"<>|\u0000-\u001f]+/g;
 
 /**
