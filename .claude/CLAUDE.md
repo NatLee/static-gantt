@@ -39,7 +39,7 @@
 - [src/lib/depPath.ts](src/lib/depPath.ts) — 依賴線的 SVG path 路由（right-angle / bezier），`DependencyLines` 與拖曳預覽線共用
 - [src/components/Gantt/TaskBarContainer.tsx](src/components/Gantt/TaskBarContainer.tsx) — 2 軸拖曳（水平改日期、垂直跨 sub-phase）
 - [src/hooks/useDragToConnect.ts](src/hooks/useDragToConnect.ts) — 拖線連接依賴
-- [src/hooks/useDragReorder.ts](src/hooks/useDragReorder.ts) — 左側列表內 phase / sub-phase / task 重排；`buildRowMap` / `findTaskDropRow` 有被 `TaskBarContainer` 共用
+- [src/hooks/useDragReorder.ts](src/hooks/useDragReorder.ts) — 左側列表內 phase / sub-phase / task 重排；`TaskBarContainer` 共用 `buildRowMap`、`taskListRowsEl`（落點從列表的列容器量起）和 `taskDropGap` / `isOwnSlot`：前者算出落點的空隙（或回傳 null 表示該列拒收），後者判斷是否只是留在原位（不畫紅色拒收列），再交給 `resolveTaskDropTarget`
 
 ## 開發與部署
 

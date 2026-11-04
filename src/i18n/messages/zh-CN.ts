@@ -35,6 +35,9 @@ const zhCN: Record<MessageKey, string> = {
   'import.unknownFormat': '此 JSON 不是本工具的项目文件或备份文件。',
   'import.noProjects': '备份文件中没有任何项目，因此没有导入。',
   'import.invalidProject': '项目“{name}”的任务数据缺失或损坏，因此没有导入。',
+  'import.replaceTitle': '要替换所有项目吗？',
+  'import.replaceBody': '这份备份有 {incoming} 个项目。导入后会替换此浏览器中现有的 {current} 个项目，且无法撤销。如需保留，请先下载备份。',
+  'import.replaceConfirm': '全部替换',
 
   // Edit menu
   'edit.undo': '撤销',

@@ -36,6 +36,9 @@ const en = {
   'import.unknownFormat': 'This JSON is not a project file or a backup from this app.',
   'import.noProjects': 'The backup contains no projects, so nothing was imported.',
   'import.invalidProject': 'Project "{name}" has missing or broken tasks, so nothing was imported.',
+  'import.replaceTitle': 'Replace all projects?',
+  'import.replaceBody': 'This backup has {incoming} project(s). Importing it replaces the {current} project(s) in this browser, and that can\'t be undone. To keep them, download a backup first.',
+  'import.replaceConfirm': 'Replace all',
 
   // Edit menu
   'edit.undo': 'Undo',

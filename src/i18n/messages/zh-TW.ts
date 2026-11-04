@@ -35,6 +35,9 @@ const zhTW: Record<MessageKey, string> = {
   'import.unknownFormat': '這個 JSON 不是本工具的專案檔或備份檔。',
   'import.noProjects': '備份檔裡沒有任何專案，所以沒有匯入。',
   'import.invalidProject': '專案「{name}」的任務資料缺漏或損壞，所以沒有匯入。',
+  'import.replaceTitle': '要取代所有專案嗎？',
+  'import.replaceBody': '這份備份有 {incoming} 個專案。匯入後會取代這個瀏覽器裡現有的 {current} 個專案，而且無法復原。如果要保留，請先下載備份。',
+  'import.replaceConfirm': '全部取代',
 
   // Edit menu
   'edit.undo': '復原',

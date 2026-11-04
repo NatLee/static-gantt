@@ -1,6 +1,6 @@
 'use client';
 
-import { Dispatch, useCallback, useRef } from 'react';
+import { Dispatch, useCallback, useRef, useState } from 'react';
 import {
   Layers,
   FilePlus,
@@ -36,7 +36,8 @@ import { Menu, MenuItem, MenuDivider, MenuHeading } from './Menu';
 import ProjectSwitcher from './ProjectSwitcher';
 import { Segmented, SegmentedButton } from './Segmented';
 import { exportToExcel } from '@/lib/exportExcel';
-import { ImportError, type ImportErrorCode } from '@/lib/projectStorage';
+import { ImportError, parseImport, type ImportErrorCode, type ImportedPayload } from '@/lib/projectStorage';
+import ConfirmDialog from '@/components/Dialogs/ConfirmDialog';
 import type { MessageKey } from '@/i18n/messages';
 import type { GanttAction, GanttState, ComputedTask } from '@/types';
 import type { ProjectsAPI, SaveStatus } from '@/hooks/usePersistentGanttState';
@@ -116,13 +117,18 @@ export default function Menubar(props: MenubarProps) {
     [dispatch]
   );
 
+  // A full backup waiting for the user to confirm that it may replace every project.
+  const [pendingBackup, setPendingBackup] = useState<Extract<ImportedPayload, { kind: 'app' }> | null>(null);
+
   const handleJsonFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
       try {
-        const text = await file.text();
-        await projectsApi.importJsonText(text);
+        const parsed = parseImport(await file.text());
+        // A single project is only added; a full backup replaces everything, so ask first.
+        if (parsed.kind === 'app') setPendingBackup(parsed);
+        else projectsApi.applyImport(parsed);
       } catch (err) {
         alert(err instanceof ImportError ? t(IMPORT_ERROR_MESSAGES[err.code], { name: err.projectName ?? '' }) : t('file.importFailed'));
       } finally {
@@ -495,6 +501,22 @@ export default function Menubar(props: MenubarProps) {
         className="hidden"
         onChange={handleMmdFileChange}
       />
+
+      {pendingBackup && (
+        <ConfirmDialog
+          title={t('import.replaceTitle')}
+          message={t('import.replaceBody', {
+            incoming: pendingBackup.storage.projects.length,
+            current: projectsApi.projects.length,
+          })}
+          confirmLabel={t('import.replaceConfirm')}
+          onConfirm={() => {
+            projectsApi.applyImport(pendingBackup);
+            setPendingBackup(null);
+          }}
+          onCancel={() => setPendingBackup(null)}
+        />
+      )}
     </div>
   );
 }

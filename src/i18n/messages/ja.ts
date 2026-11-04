@@ -35,6 +35,9 @@ const ja: Record<MessageKey, string> = {
   'import.unknownFormat': 'この JSON は、このアプリのプロジェクトファイルでもバックアップでもありません。',
   'import.noProjects': 'バックアップにプロジェクトが含まれていないため、何もインポートしませんでした。',
   'import.invalidProject': 'プロジェクト「{name}」のタスクが欠けているか壊れているため、何もインポートしませんでした。',
+  'import.replaceTitle': 'すべてのプロジェクトを置き換えますか？',
+  'import.replaceBody': 'このバックアップには {incoming} 件のプロジェクトがあります。インポートすると、このブラウザーにある {current} 件のプロジェクトが置き換えられ、元に戻せません。残したい場合は、先にバックアップをダウンロードしてください。',
+  'import.replaceConfirm': 'すべて置き換える',
 
   // Edit menu
   'edit.undo': '元に戻す',
