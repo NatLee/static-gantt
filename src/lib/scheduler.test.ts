@@ -31,6 +31,16 @@ describe('computeSchedule: forward pass', () => {
     expect(s.get('c')!.startDayOffset).toBe(7);
   });
 
+  // The task editor and older imports can leave "a," or " a , b" behind; the forward pass used
+  // to treat the blank entry as a missing task and left the bar unscheduled.
+  it('accepts blanks and spaces in the predecessor list', () => {
+    const s = byId(computeSchedule([
+      task('a', { start: '2026-03-01', duration: 3 }),
+      task('c', { after: ' a , ', duration: 1 }),
+    ]));
+    expect(s.get('c')!.startDayOffset).toBe(3);
+  });
+
   it('resolves dependencies regardless of list order', () => {
     const s = byId(computeSchedule([
       task('c', { after: 'b', duration: 1 }),

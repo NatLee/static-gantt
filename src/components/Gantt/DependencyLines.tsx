@@ -6,6 +6,7 @@ import { PIXELS_PER_DAY, ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
 import { buildDepPath, buildArrowHead } from '@/lib/depPath';
 import { offsetToDate, formatISO } from '@/lib/dateUtils';
+import { parseAfter } from '@/lib/dependencies';
 
 interface DependencyLinesProps {
   computed: ComputedTask[];
@@ -53,7 +54,7 @@ export default function DependencyLines({
       if (!task.after || task.rowIndex === undefined || Number.isNaN(task.startDayOffset)) return;
 
       const taskRowIndex = task.rowIndex;
-      const pres = task.after.split(',').map((s) => s.trim()).filter(Boolean);
+      const pres = parseAfter(task.after);
 
       pres.forEach((preId) => {
         const pre = lookup.get(preId);

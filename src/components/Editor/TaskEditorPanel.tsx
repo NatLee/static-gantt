@@ -3,6 +3,7 @@
 import { Dispatch, useEffect, useState, useCallback, useMemo } from 'react';
 import { GanttState, GanttAction, ComputedTask, TaskStatus } from '@/types';
 import { offsetToDate, formatISO } from '@/lib/dateUtils';
+import { formatAfter, parseAfter } from '@/lib/dependencies';
 import { wouldCreateCycle } from '@/lib/cycleCheck';
 import { useI18n } from '@/i18n/I18nProvider';
 
@@ -70,17 +71,12 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
     // dependency cycle. Any of those would leave the task (and its descendants)
     // unschedulable — computeSchedule would resolve them to NaN and the bars
     // would silently disappear from the chart.
-    const cleanedAfter = [
-      ...new Set(
-        after
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean)
-          .filter(pid => pid !== editingTaskId)
-          .filter(pid => taskMap.has(pid))
-          .filter(pid => !wouldCreateCycle(state.tasks, pid, editingTaskId))
-      ),
-    ].join(',');
+    const cleanedAfter = formatAfter(
+      parseAfter(after)
+        .filter(pid => pid !== editingTaskId)
+        .filter(pid => taskMap.has(pid))
+        .filter(pid => !wouldCreateCycle(state.tasks, pid, editingTaskId))
+    );
 
     // Precedence: a valid predecessor wins; else a fixed start date; else fall
     // back to anchoring at the task's current scheduled start so it never

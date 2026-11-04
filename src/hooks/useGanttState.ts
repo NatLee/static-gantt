@@ -4,6 +4,7 @@ import { defaultTasks, defaultMilestones, PROJECT_START_DATE } from '@/data/defa
 import { computeSchedule, buildHierarchy, computeTimelineBounds, annotateWorkload } from '@/lib/scheduler';
 import { rewireDependencies } from '@/lib/dependencyRewire';
 import { joinPhase, masterOf, splitPhase } from '@/lib/phase';
+import { formatAfter, parseAfter } from '@/lib/dependencies';
 import { useUndoableReducer } from './useUndoableReducer';
 
 const initialBounds = computeTimelineBounds(
@@ -128,10 +129,12 @@ export function ganttReducer(state: GanttState, action: GanttAction): GanttState
       if (targetIdx === -1) return state;
       const newTask = { ...action.task, after: action.targetTaskId };
       delete newTask.start;
-      // Any task that depended on targetTask now depends on the new task
+      // Any task that depended on targetTask now depends on the new task instead,
+      // including tasks that wait for several predecessors.
       tasks.forEach(t => {
-        if (t.after === action.targetTaskId && t.id !== newTask.id) {
-          t.after = newTask.id;
+        const preds = parseAfter(t.after);
+        if (t.id !== newTask.id && preds.includes(action.targetTaskId)) {
+          t.after = formatAfter(preds.map(id => (id === action.targetTaskId ? newTask.id : id)));
         }
       });
       tasks.splice(targetIdx + 1, 0, newTask);
@@ -330,10 +333,9 @@ export function ganttReducer(state: GanttState, action: GanttAction): GanttState
     case 'ADD_TASK_DEPENDENCY': {
       const tasks = state.tasks.map(t => {
         if (t.id !== action.taskId) return t;
-        const existing = t.after ? t.after.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const existing = parseAfter(t.after);
         if (existing.includes(action.predecessorId)) return t;
-        const after = [...existing, action.predecessorId].join(',');
-        const next = { ...t, after };
+        const next = { ...t, after: formatAfter([...existing, action.predecessorId]) };
         delete next.start;
         return next;
       });
@@ -343,13 +345,10 @@ export function ganttReducer(state: GanttState, action: GanttAction): GanttState
     case 'REMOVE_TASK_DEPENDENCY': {
       const tasks = state.tasks.map(t => {
         if (t.id !== action.taskId || !t.after) return t;
-        const remaining = t.after
-          .split(',')
-          .map(s => s.trim())
-          .filter(s => s && s !== action.predecessorId);
+        const remaining = formatAfter(parseAfter(t.after).filter(id => id !== action.predecessorId));
         const next = { ...t };
-        if (remaining.length > 0) {
-          next.after = remaining.join(',');
+        if (remaining) {
+          next.after = remaining;
         } else {
           delete next.after;
           // No predecessors left: anchor the task at its current date so it

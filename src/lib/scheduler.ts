@@ -1,6 +1,7 @@
 import { Task, ComputedTask, HierarchyMap } from '@/types';
 import { PROJECT_START_DATE } from '@/data/defaultProject';
 import { splitPhase } from '@/lib/phase';
+import { parseAfter } from '@/lib/dependencies';
 
 const MS_PER_DAY = 86400000;
 
@@ -68,7 +69,7 @@ export function computeSchedule(tasks: Task[], opts: ScheduleOptions = {}): Comp
         );
         t.endDayOffset = endFor(t.startDayOffset, t.duration);
       } else if (t.after) {
-        const pres = t.after.split(',').map(s => s.trim());
+        const pres = parseAfter(t.after);
         let mx = -Infinity;
         let ok = true;
         for (const pid of pres) {
@@ -109,9 +110,7 @@ function computeCriticalPath(taskMap: Record<string, ComputedTask>): void {
   // successors[predId] = [ids of tasks that depend on predId]
   const successors: Record<string, string[]> = {};
   for (const id in taskMap) {
-    const after = taskMap[id].after;
-    if (!after) continue;
-    after.split(',').map(s => s.trim()).filter(Boolean).forEach(pid => {
+    parseAfter(taskMap[id].after).forEach(pid => {
       (successors[pid] ||= []).push(id);
     });
   }
@@ -163,10 +162,7 @@ function computeCriticalPath(taskMap: Record<string, ComputedTask>): void {
   }
   while (stack.length) {
     const t = taskMap[stack.pop()!];
-    if (!t.after) continue;
-    const preds = t.after
-      .split(',')
-      .map(s => s.trim())
+    const preds = parseAfter(t.after)
       .filter(pid => taskMap[pid] && Number.isFinite(taskMap[pid].endDayOffset));
     if (preds.length === 0) continue;
     let maxEnd = -Infinity;

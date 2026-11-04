@@ -51,6 +51,14 @@ describe('ganttReducer: dates and dependencies', () => {
     expect(find(s, 'b').after).toBe('n');
   });
 
+  it('ADD_AFTER_TASK also re-points successors that wait for several tasks', () => {
+    const s = ganttReducer(stateWith([
+      task('a', { start: '2026-03-01' }), task('x', { start: '2026-03-01' }), task('b', { after: 'x,a' }),
+    ]), { type: 'ADD_AFTER_TASK', targetTaskId: 'a', task: task('n') });
+    expect(find(s, 'b').after).toBe('x,n');
+    expect(find(s, 'n').after).toBe('a');
+  });
+
   it('DELETE_TASK rewires successors and clears the selection', () => {
     let s = stateWith([task('a', { start: '2026-03-01' }), task('b', { after: 'a' }), task('c', { after: 'b' })]);
     s = { ...s, selectedTaskId: 'b' };
