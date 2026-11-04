@@ -43,6 +43,20 @@ export function serializeState(state: GanttState): SerializableGanttState {
   };
 }
 
+/**
+ * Storage with the open project's current editor state written in. Autosave lags behind by a
+ * moment, so anything that reads projects from storage (switching, copying, downloading) goes
+ * through this to see the latest edits.
+ */
+export function withLiveState(storage: AppStorage, live: GanttState): AppStorage {
+  return {
+    ...storage,
+    projects: storage.projects.map(p =>
+      p.id === storage.activeProjectId ? { ...p, updatedAt: now(), state: serializeState(live) } : p
+    ),
+  };
+}
+
 export function buildDefaultProject(name = 'Default Project'): ProjectFile {
   const bounds = computeTimelineBounds(computeSchedule(defaultTasks), defaultMilestones);
   const id = makeId();

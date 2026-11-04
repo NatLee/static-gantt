@@ -173,18 +173,12 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                         <IconButton
                           icon={<Copy className="w-3 h-3" />}
                           title={t('common.duplicate')}
-                          onClick={() => {
-                            if (!isActive) api.switchTo(p.id);
-                            api.duplicateActive();
-                          }}
+                          onClick={() => api.duplicate(p.id)}
                         />
                         <IconButton
                           icon={<Download className="w-3 h-3" />}
                           title={t('common.download')}
-                          onClick={() => {
-                            if (!isActive) api.switchTo(p.id);
-                            api.downloadActive();
-                          }}
+                          onClick={() => api.download(p.id)}
                         />
                         <IconButton
                           icon={<Trash2 className="w-3 h-3" />}

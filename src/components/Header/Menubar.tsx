@@ -193,7 +193,7 @@ export default function Menubar(props: MenubarProps) {
           <MenuItem
             icon={<Copy className="w-3.5 h-3.5" />}
             label={t('file.duplicate')}
-            onClick={() => projectsApi.duplicateActive()}
+            onClick={() => projectsApi.duplicate(projectsApi.activeProjectId)}
           />
           <MenuItem
             icon={<FileText className="w-3.5 h-3.5" />}
@@ -204,7 +204,7 @@ export default function Menubar(props: MenubarProps) {
           <MenuItem
             icon={<Download className="w-3.5 h-3.5" />}
             label={t('file.downloadJson')}
-            onClick={() => projectsApi.downloadActive()}
+            onClick={() => projectsApi.download(projectsApi.activeProjectId)}
           />
           <MenuItem
             icon={<HardDriveDownload className="w-3.5 h-3.5" />}
@@ -405,7 +405,7 @@ export default function Menubar(props: MenubarProps) {
           <MenuItem
             icon={<Download className="w-3.5 h-3.5" />}
             label={t('export.jsonProject')}
-            onClick={() => projectsApi.downloadActive()}
+            onClick={() => projectsApi.download(projectsApi.activeProjectId)}
           />
           <MenuDivider />
           <MenuHeading>{t('export.mermaid')}</MenuHeading>

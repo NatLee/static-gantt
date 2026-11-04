@@ -8,6 +8,7 @@ import {
   parseImport,
   saveAppStorage,
   serializeState,
+  withLiveState,
 } from './projectStorage';
 import { exportBaseName, safeFileName } from './download';
 import { ganttReducer } from '@/hooks/useGanttState';
@@ -187,5 +188,18 @@ describe('exportBaseName', () => {
     expect(exportBaseName('Website relaunch')).toBe('Website-relaunch');
     expect(exportBaseName('Website relaunch', 'Phase 2')).toBe('Website-relaunch-Phase-2');
     expect(exportBaseName('', 'ALL')).toBe('gantt');
+  });
+});
+
+describe('withLiveState', () => {
+  // The project list's Duplicate and Download buttons switched to the picked project and then
+  // read the *previous* project's editor state, so the copy or file had the wrong tasks.
+  it('writes the open project\'s editor state and leaves the others as saved', () => {
+    const stored = savedV1 as AppStorage;
+    const live = { ...emptyState(), tasks: [{ id: 'live', phase: 'Phase 1 X', name: 'Edited', duration: 2, status: 'planned' as const, isCritical: false, start: '2026-06-01' }] };
+    const merged = withLiveState(stored, live);
+    expect(merged.projects[0].state.tasks.map(t => t.id)).toEqual(['live']);
+    expect(merged.projects[1]).toEqual(stored.projects[1]);
+    expect(stored.projects[0].state.tasks).toHaveLength(3); // input untouched
   });
 });
