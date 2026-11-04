@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildRowMap, resolveTaskDropTarget } from './useDragReorder';
+import { buildRowMap, findTaskDropRow, resolveTaskDropTarget, taskDropGap } from './useDragReorder';
 import { buildHierarchy, computeSchedule } from '@/lib/scheduler';
 import { task } from '@/test/helpers';
+import { ROW_HEIGHT } from '@/lib/ganttLayout';
 
 const hierarchyOf = (tasks: Parameters<typeof computeSchedule>[0]) => buildHierarchy(computeSchedule(tasks));
 
@@ -60,6 +61,35 @@ describe('resolveTaskDropTarget at the end of a group', () => {
 
   it('does nothing when dropped back into its own slot', () => {
     expect(resolveTaskDropTarget(src, gapAfter('a1') - 1, rows)).toBeNull();
+  });
+});
+
+describe('taskDropGap / findTaskDropRow', () => {
+  const rows = buildRowMap(hierarchyOf([
+    task('a1', { phase: 'Phase 1 UX', start: '2026-03-01' }),
+    task('a2', { phase: 'Phase 1 UX', start: '2026-03-01' }),
+    task('a3', { phase: 'Phase 1 UX', start: '2026-03-01' }),
+  ]), 'ALL', new Set(), new Set());
+  const src = { type: 'task' as const, masterPhase: 'Phase 1', subPhase: 'UX', taskId: 'a2' };
+  const row = (id: string) => rows.findIndex(r => r.taskId === id);
+  const upper = (r: number) => r * ROW_HEIGHT + 5;
+  const lower = (r: number) => r * ROW_HEIGHT + ROW_HEIGHT - 5;
+
+  it('treats the upper half of a row as above it and the lower half as below it', () => {
+    expect(taskDropGap(row('a1'), upper(row('a1')), rows)).toBe(row('a1'));
+    expect(taskDropGap(row('a3'), lower(row('a3')), rows)).toBe(row('a3') + 1);
+  });
+
+  it('does not move a task that stays next to itself', () => {
+    expect(findTaskDropRow(row('a2'), upper(row('a2')), rows, src)).toBeNull();
+    expect(findTaskDropRow(row('a1'), lower(row('a1')), rows, src)).toBeNull();
+    expect(findTaskDropRow(row('a3'), upper(row('a3')), rows, src)).toBeNull();
+    expect(findTaskDropRow(row('a3'), lower(row('a3')), rows, src)).toBe(row('a3') + 1);
+  });
+
+  it('refuses a phase header whose sub-phases are collapsed away', () => {
+    const collapsed = buildRowMap(hierarchyOf([task('x', { phase: 'Phase 1 UX', start: '2026-03-01' })]), 'ALL', new Set(['Phase 1']), new Set());
+    expect(taskDropGap(0, 5, collapsed)).toBeNull();
   });
 });
 

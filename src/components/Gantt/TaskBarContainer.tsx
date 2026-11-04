@@ -8,7 +8,7 @@ import { STATUS_LABEL_KEYS } from '@/i18n/messages';
 import { endOffsetFor } from '@/lib/scheduler';
 import { PIXELS_PER_DAY, ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
-import { buildRowMap, findTaskDropRow, resolveTaskDropTarget, taskListRowsEl, type RowItem } from '@/hooks/useDragReorder';
+import { buildRowMap, isOwnSlot, resolveTaskDropTarget, taskDropGap, taskListRowsEl, type RowItem } from '@/hooks/useDragReorder';
 import type { ConnectDirection } from '@/hooks/useDragToConnect';
 import { useRowHover } from '@/hooks/useRowHover';
 import { updateDepsForTask } from '@/lib/depLineLive';
@@ -224,6 +224,7 @@ export default function TaskBarContainer({
           const scrollEl = scrollContainerRef.current;
           let dropRow: number | null = null;
           let clampedHoveredRow: number | null = null;
+          let rejected = false;
           if (scrollEl) {
             const listAreaEl = taskListRowsEl(scrollEl);
             if (listAreaEl) {
@@ -232,21 +233,26 @@ export default function TaskBarContainer({
               const hoveredRow = Math.floor(relativeY / ROW_HEIGHT);
               if (hoveredRow >= 0 && ds.rowMap.length > 0) {
                 // Clamp so dragging past the last row still yields a valid
-                // findTaskDropRow hit; the helper can then return rowMap.length
+                // taskDropGap hit; the helper can then return rowMap.length
                 // for "append at end" semantics.
                 clampedHoveredRow = Math.min(hoveredRow, ds.rowMap.length - 1);
-                dropRow = findTaskDropRow(clampedHoveredRow, relativeY, ds.rowMap, {
-                  type: 'task',
+                const source = {
+                  type: 'task' as const,
                   masterPhase: ds.sourceMaster,
                   subPhase: ds.sourceSub,
                   taskId: ds.taskId,
-                });
+                };
+                const gap = taskDropGap(clampedHoveredRow, relativeY, ds.rowMap);
+                // Over its own slot the task just changes dates: neither a drop line nor the
+                // red "can't drop here" band, which is for rows that really refuse a task.
+                dropRow = gap !== null && !isOwnSlot(gap, ds.rowMap, source) ? gap : null;
+                rejected = gap === null;
               }
             }
           }
           ds.dropRow = dropRow;
 
-          const isForbiddenHover = clampedHoveredRow !== null && dropRow === null;
+          const isForbiddenHover = clampedHoveredRow !== null && rejected;
 
           // Update drop indicator (valid drop → thin line between rows)
           if (ds.dropIndicatorEl) {

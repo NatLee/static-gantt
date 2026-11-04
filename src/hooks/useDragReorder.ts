@@ -342,46 +342,37 @@ function findSubPhaseDropRow(
   return dropRow;
 }
 
+/**
+ * The gap (index into rowMap: "in front of row N") a task would go to with the pointer at
+ * `relativeY` over `hoveredRow`, or null where tasks can't be dropped (a phase without an open
+ * sub-phase). Over a task row the upper half means "above it", the lower half "below it".
+ */
+export function taskDropGap(hoveredRow: number, relativeY: number, rowMap: RowItem[]): number | null {
+  const inTopHalf = (relativeY % ROW_HEIGHT) < ROW_HEIGHT / 2;
+  const hoveredItem = rowMap[hoveredRow];
+  if (!hoveredItem) return null;
+  if (hoveredItem.type === 'task') return inTopHalf ? hoveredRow : hoveredRow + 1;
+  // Over a sub-phase header: first task of that sub-phase.
+  if (hoveredItem.type === 'sub-phase') return hoveredRow + 1;
+  // Over a phase header: first task of its first sub-phase.
+  if (rowMap[hoveredRow + 1]?.type === 'sub-phase') return hoveredRow + 2;
+  return null;
+}
+
+/** True when dropping into `gap` would leave the task exactly where it is. */
+export function isOwnSlot(gap: number, rowMap: RowItem[], source: DragSource): boolean {
+  return rowMap[gap]?.taskId === source.taskId || rowMap[gap - 1]?.taskId === source.taskId;
+}
+
+/** The gap a dragged task would move to, or null when it would not move. */
 export function findTaskDropRow(
   hoveredRow: number,
   relativeY: number,
   rowMap: RowItem[],
   source: DragSource,
 ): number | null {
-  const inTopHalf = (relativeY % ROW_HEIGHT) < ROW_HEIGHT / 2;
-  const hoveredItem = rowMap[hoveredRow];
-  if (!hoveredItem) return null;
-
-  // Tasks can only be dropped among task rows or right after a sub-phase header
-  if (hoveredItem.type === 'task') {
-    const dropRow = inTopHalf ? hoveredRow : hoveredRow + 1;
-    // Don't drop on self (same position)
-    if (hoveredItem.taskId === source.taskId) return null;
-    // Check if dropping right after self
-    if (!inTopHalf && hoveredRow + 1 < rowMap.length) {
-      const nextItem = rowMap[hoveredRow + 1];
-      if (nextItem?.taskId === source.taskId) return null;
-    }
-    if (inTopHalf && hoveredRow > 0) {
-      const prevItem = rowMap[hoveredRow - 1];
-      if (prevItem?.taskId === source.taskId) return null;
-    }
-    return dropRow;
-  }
-
-  if (hoveredItem.type === 'sub-phase') {
-    // Drop as first task in this sub-phase
-    return hoveredRow + 1;
-  }
-
-  if (hoveredItem.type === 'phase') {
-    // Drop into first sub-phase of this phase, or skip
-    if (hoveredRow + 1 < rowMap.length && rowMap[hoveredRow + 1].type === 'sub-phase') {
-      return hoveredRow + 2; // after the first sub-phase header
-    }
-  }
-
-  return null;
+  const gap = taskDropGap(hoveredRow, relativeY, rowMap);
+  return gap === null || isOwnSlot(gap, rowMap, source) ? null : gap;
 }
 
 // ---- Dispatch helpers ----

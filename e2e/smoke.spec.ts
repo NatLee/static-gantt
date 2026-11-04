@@ -93,6 +93,8 @@ test('dragging a bar sideways changes its dates only', async ({ page }) => {
   // Hold longer than the 500 ms hover delay; the tooltip used to open in the middle of the drag.
   await dragBar(page, 'p2a', 50, 0, 800);
   await expect(page.getByRole('tooltip')).toHaveCount(0);
+  // Staying in its own row is not a refused drop: no red "can't drop here" band.
+  await expect(page.locator('.bar-drag-forbidden-indicator').first()).toBeHidden();
   await page.mouse.up();
   // 50 px at the default week zoom (10 px per day) is five days later.
   await expect(bar(page, 'p2a')).toHaveAttribute('aria-label', /2026\/03\/18 to/);
