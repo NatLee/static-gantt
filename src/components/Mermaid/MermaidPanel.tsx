@@ -12,6 +12,7 @@ import {
 import { GanttState } from '@/types';
 import { generateMermaidFromData } from '@/lib/mermaidGenerator';
 import { formatMermaid } from '@/lib/mermaidFormat';
+import { todayISO } from '@/lib/dateUtils';
 import CodeMirror from '@uiw/react-codemirror';
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { mermaidLanguage } from '@/lib/codemirror/mermaidLang';
@@ -315,7 +316,7 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
 
     const handleInsertTask = useCallback(() => {
       const id = `t${Date.now().toString(36).slice(-4)}`;
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const name = 'New Task';
       const snippet = `    ${name.padEnd(40, ' ')}:${id}, ${today}, 5d`;
       insertAtCursor(snippet);
@@ -334,7 +335,7 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
 
     const handleInsertMilestone = useCallback(() => {
       const id = `m${Date.now().toString(36).slice(-4)}`;
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const name = 'New Milestone';
       const snippet = `    ${name.padEnd(40, ' ')}:milestone, ${id}, ${today}, 0d`;
       insertAtCursor(snippet);

@@ -1,31 +1,31 @@
 import { ComputedTask } from '@/types';
-import { PROJECT_START_DATE } from '@/data/defaultProject';
-import { formatISO } from './dateUtils';
+import { offsetToISO } from './dateUtils';
 import { masterOf } from './phase';
 
-const MS_PER_DAY = 86400000;
+export type ExcelRow = Record<string, string | number>;
 
-export async function exportToExcel(tasks: ComputedTask[], filter: string) {
-  const mod = await import('xlsx');
-  const XLSX = (mod as unknown as { default?: typeof mod }).default ?? mod;
-  const data: Record<string, string | number | boolean>[] = [];
+const STATUS_LABELS: Record<ComputedTask['status'], string> = {
+  done: 'Done',
+  'in-progress': 'In Progress',
+  planned: 'Planned',
+};
 
-  tasks.forEach(t => {
-    if (filter !== 'ALL' && masterOf(t.phase) !== filter) return;
+/** A task that could not be scheduled (missing predecessor, cycle) has no dates. */
+const dayOrBlank = (offset: number) => (Number.isFinite(offset) ? offsetToISO(offset) : '');
 
-    const sd = new Date(PROJECT_START_DATE.getTime() + t.startDayOffset * MS_PER_DAY);
-    const ed = new Date(PROJECT_START_DATE.getTime() + t.endDayOffset * MS_PER_DAY);
-    const st = t.status === 'done' ? 'Done' : t.status === 'in-progress' ? 'In Progress' : 'Planned';
-
-    data.push({
+/** One spreadsheet row per task in the current phase filter ("ALL" or a master phase). */
+export function buildExcelRows(tasks: ComputedTask[], filter: string): ExcelRow[] {
+  return tasks
+    .filter(t => filter === 'ALL' || masterOf(t.phase) === filter)
+    .map(t => ({
       'Phase': t.phase,
       'Task ID': t.id,
       'Task Name': t.name,
-      'Status': st,
+      'Status': STATUS_LABELS[t.status] ?? t.status,
       'Progress (%)': typeof t.progress === 'number' ? t.progress : 0,
       'Duration (days)': t.duration,
-      'Start Date': formatISO(sd),
-      'End Date': formatISO(ed),
+      'Start Date': dayOrBlank(t.startDayOffset),
+      'End Date': dayOrBlank(t.endDayOffset),
       'Critical Path': t.isOnCriticalPath || t.isCritical ? 'Yes' : 'No',
       'Slack (days)': Number.isFinite(t.totalFloat) ? t.totalFloat : '',
       'Predecessor': t.after || 'None',
@@ -33,10 +33,13 @@ export async function exportToExcel(tasks: ComputedTask[], filter: string) {
       'Tags': (t.tags || []).join(', '),
       'Color': t.color || '',
       'Description': t.description || '',
-    });
-  });
+    }));
+}
 
-  const ws = XLSX.utils.json_to_sheet(data);
+export async function exportToExcel(tasks: ComputedTask[], filter: string) {
+  const mod = await import('xlsx');
+  const XLSX = (mod as unknown as { default?: typeof mod }).default ?? mod;
+  const ws = XLSX.utils.json_to_sheet(buildExcelRows(tasks, filter));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Roadmap');
   XLSX.writeFile(wb, `SaaS_Roadmap_${filter}.xlsx`);

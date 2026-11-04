@@ -2,7 +2,7 @@
 
 import React, { useRef, useCallback, useMemo, useEffect, useLayoutEffect, useState } from 'react';
 import { GanttState, GanttAction, ComputedTask, HierarchyMap } from '@/types';
-import { offsetToDate, formatDateFull, dateToOffset } from '@/lib/dateUtils';
+import { offsetToDate, formatDateFull, todayOffset } from '@/lib/dateUtils';
 import TimelineHeader from './TimelineHeader';
 import TaskListColumn from './TaskListColumn';
 import GridBackground from './GridBackground';
@@ -138,12 +138,12 @@ export default function GanttPanel({
     if (didScrollToTodayRef.current) return;
     const el = scrollContainerRef.current;
     if (!el || totalWidth <= 0) return;
-    const todayOffset = dateToOffset(new Date());
-    if (todayOffset < state.timelineStartDay || todayOffset > state.timelineEndDay) {
+    const today = todayOffset();
+    if (today < state.timelineStartDay || today > state.timelineEndDay) {
       didScrollToTodayRef.current = true;
       return;
     }
-    const todayLeftPx = (todayOffset - state.timelineStartDay) * ppd;
+    const todayLeftPx = (today - state.timelineStartDay) * ppd;
     // Put today at ~25% from the left edge so some past context stays visible.
     el.scrollLeft = Math.max(0, todayLeftPx - el.clientWidth * 0.25);
     didScrollToTodayRef.current = true;

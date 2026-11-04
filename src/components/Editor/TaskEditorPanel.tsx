@@ -2,7 +2,7 @@
 
 import { Dispatch, useEffect, useState, useCallback, useMemo } from 'react';
 import { GanttState, GanttAction, ComputedTask, TaskStatus } from '@/types';
-import { offsetToDate, formatISO } from '@/lib/dateUtils';
+import { offsetToISO, todayISO } from '@/lib/dateUtils';
 import { formatAfter, parseAfter } from '@/lib/dependencies';
 import { wouldCreateCycle } from '@/lib/cycleCheck';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -91,8 +91,8 @@ export default function TaskEditorPanel({ state, dispatch, taskMap }: TaskEditor
       updates.after = undefined;
       updates.start =
         task && Number.isFinite(task.startDayOffset)
-          ? formatISO(offsetToDate(task.startDayOffset))
-          : formatISO(new Date());
+          ? offsetToISO(task.startDayOffset)
+          : todayISO();
     }
 
     dispatch({ type: 'UPDATE_TASK', taskId: editingTaskId, updates });

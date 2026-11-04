@@ -2,7 +2,7 @@
 
 import { Dispatch, useEffect, useState, useRef, useCallback } from 'react';
 import { GanttState, GanttAction, Task } from '@/types';
-import { genId, formatISO } from '@/lib/dateUtils';
+import { genId, todayISO } from '@/lib/dateUtils';
 import { MS_COLORS } from '@/data/defaultProject';
 import { DEFAULT_SUB_PHASE, joinPhase, masterOf } from '@/lib/phase';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -105,7 +105,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           // Link after the last existing task so the new phase lands at the end
           // of the schedule; if the project is empty, anchor to today so the
           // bar is actually schedulable (an unanchored task renders as NaN).
-          ...(lastId ? { after: lastId } : { start: formatISO(new Date()) }),
+          ...(lastId ? { after: lastId } : { start: todayISO() }),
         };
         dispatch({ type: 'ADD_TASK', task: newTask });
         break;
@@ -123,7 +123,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           duration: Math.max(1, duration),
           status: 'planned',
           isCritical: false,
-          ...(lastId ? { after: lastId } : { start: formatISO(new Date()) }),
+          ...(lastId ? { after: lastId } : { start: todayISO() }),
         };
         dispatch({ type: 'ADD_TASK', task: newTask, afterIndex: lastIdx });
         break;
@@ -161,7 +161,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           isCritical: false,
           // Anchor to today when there's no predecessor to chain after, so the
           // first task in a phase/project is always visible.
-          ...(linkAfter ? { after: linkAfter } : { start: formatISO(new Date()) }),
+          ...(linkAfter ? { after: linkAfter } : { start: todayISO() }),
         };
         dispatch({ type: 'ADD_TASK', task: newTask, afterIndex: afterIdx >= 0 ? afterIdx : undefined });
         break;

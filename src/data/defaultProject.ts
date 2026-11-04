@@ -1,6 +1,5 @@
 import { Task, Milestone } from '@/types';
 
-export const PROJECT_START_DATE = new Date('2026-03-01');
 export const PROJECT_TITLE = 'SaaS Platform Launch Plan';
 export const PROJECT_SUBTITLE = 'Strategic Product Roadmap (2026)';
 

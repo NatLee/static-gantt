@@ -38,12 +38,7 @@ export function serializeState(state: GanttState): SerializableGanttState {
 }
 
 export function buildDefaultProject(name = 'Default Project'): ProjectFile {
-  const PROJECT_START_DATE = new Date();
-  const bounds = computeTimelineBounds(
-    computeSchedule(defaultTasks),
-    defaultMilestones,
-    PROJECT_START_DATE
-  );
+  const bounds = computeTimelineBounds(computeSchedule(defaultTasks), defaultMilestones);
   const id = makeId();
   const ts = now();
   return {

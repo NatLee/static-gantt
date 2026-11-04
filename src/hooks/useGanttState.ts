@@ -1,17 +1,13 @@
 import { useMemo } from 'react';
 import { GanttState, GanttAction, ComputedTask, HierarchyMap, Task } from '@/types';
-import { defaultTasks, defaultMilestones, PROJECT_START_DATE } from '@/data/defaultProject';
+import { defaultTasks, defaultMilestones } from '@/data/defaultProject';
 import { computeSchedule, buildHierarchy, computeTimelineBounds, annotateWorkload } from '@/lib/scheduler';
 import { rewireDependencies } from '@/lib/dependencyRewire';
 import { joinPhase, masterOf, splitPhase } from '@/lib/phase';
 import { formatAfter, parseAfter } from '@/lib/dependencies';
 import { useUndoableReducer } from './useUndoableReducer';
 
-const initialBounds = computeTimelineBounds(
-  computeSchedule(defaultTasks),
-  defaultMilestones,
-  PROJECT_START_DATE
-);
+const initialBounds = computeTimelineBounds(computeSchedule(defaultTasks), defaultMilestones);
 
 const initialState: GanttState = {
   tasks: defaultTasks,
@@ -465,7 +461,7 @@ export function useGanttState() {
   const masterPhases = useMemo(() => Object.keys(hierarchy), [hierarchy]);
 
   const bounds = useMemo(() => {
-    return computeTimelineBounds(computed, state.milestones, PROJECT_START_DATE);
+    return computeTimelineBounds(computed, state.milestones);
   }, [computed, state.milestones]);
 
   // Auto-extend timeline when bounds change

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { offsetToDate, dateToOffset } from '@/lib/dateUtils';
+import { isWeekendOffset, todayOffset } from '@/lib/dateUtils';
 
 interface GridBackgroundProps {
   totalRows: number;
@@ -23,8 +23,7 @@ export default function GridBackground({
     const spans: { left: number; width: number }[] = [];
     let cursorStart: number | null = null;
     for (let d = timelineStartDay; d <= timelineEndDay; d++) {
-      const day = offsetToDate(d).getDay();
-      const isWeekend = day === 0 || day === 6;
+      const isWeekend = isWeekendOffset(d);
       if (isWeekend && cursorStart === null) cursorStart = d;
       if ((!isWeekend || d === timelineEndDay) && cursorStart !== null) {
         const endDay = isWeekend ? d + 1 : d;
@@ -35,10 +34,10 @@ export default function GridBackground({
         cursorStart = null;
       }
     }
-    const todayOffset = dateToOffset(new Date());
+    const today = todayOffset();
     const todayLeft =
-      todayOffset >= timelineStartDay && todayOffset <= timelineEndDay
-        ? (todayOffset - timelineStartDay) * ppd
+      today >= timelineStartDay && today <= timelineEndDay
+        ? (today - timelineStartDay) * ppd
         : null;
     return { weekendSpans: spans, todayLeft };
   }, [timelineStartDay, timelineEndDay, ppd]);

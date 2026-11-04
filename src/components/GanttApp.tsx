@@ -16,7 +16,7 @@ import { RowHoverProvider } from '@/hooks/useRowHover';
 import { defaultTasks } from '@/data/defaultProject';
 import SearchPanel from '@/components/Gantt/SearchPanel';
 import { parseMermaidToTasks } from '@/lib/mermaidParser';
-import { dateToOffset } from '@/lib/dateUtils';
+import { todayOffset } from '@/lib/dateUtils';
 import { PIXELS_PER_DAY } from '@/lib/ganttLayout';
 import dynamic from 'next/dynamic';
 import type { MermaidPanelHandle } from '@/components/Mermaid/MermaidPanel';
@@ -131,9 +131,9 @@ export default function GanttApp() {
     if (state.currentMode !== 'visual') return;
     const container = document.getElementById('gantt-scroll-container');
     if (!container) return;
-    const todayOffset = dateToOffset(new Date());
+    const today = todayOffset();
     const ppd = PIXELS_PER_DAY * state.zoomScale;
-    const x = (todayOffset - state.timelineStartDay) * ppd;
+    const x = (today - state.timelineStartDay) * ppd;
     const viewportWidth = container.clientWidth;
     container.scrollTo({
       left: Math.max(0, x - viewportWidth / 2),

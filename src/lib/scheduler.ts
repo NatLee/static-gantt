@@ -1,22 +1,16 @@
 import { Task, ComputedTask, HierarchyMap } from '@/types';
-import { PROJECT_START_DATE } from '@/data/defaultProject';
+import { dateToOffset, isWeekendOffset, todayOffset } from '@/lib/dateUtils';
 import { splitPhase } from '@/lib/phase';
 import { parseAfter } from '@/lib/dependencies';
-
-const MS_PER_DAY = 86400000;
 
 export interface ScheduleOptions {
   /** Interpret durations as working days, skipping weekends. */
   workingDaysOnly?: boolean;
 }
 
-// A day offset is a weekend when the local weekday is Sat/Sun. Mirrors the
-// weekend shading in GridBackground (offsetToDate(d).getDay()) so bars that
-// skip weekends stay visually aligned with the shaded columns.
-function isWeekendOffset(offset: number): boolean {
-  const day = new Date(PROJECT_START_DATE.getTime() + offset * MS_PER_DAY).getDay();
-  return day === 0 || day === 6;
-}
+/** Days of empty timeline shown before the first and after the last scheduled day. */
+const TIMELINE_PADDING_BEFORE = 30;
+const TIMELINE_PADDING_AFTER = 60;
 
 // Exclusive end offset that makes a bar starting at `start` cover `duration`
 // working days, spanning over any weekends it crosses.
@@ -64,9 +58,7 @@ export function computeSchedule(tasks: Task[], opts: ScheduleOptions = {}): Comp
       if (!Number.isNaN(t.startDayOffset)) continue;
 
       if (t.start) {
-        t.startDayOffset = Math.round(
-          (new Date(t.start).getTime() - PROJECT_START_DATE.getTime()) / MS_PER_DAY
-        );
+        t.startDayOffset = dateToOffset(t.start);
         t.endDayOffset = endFor(t.startDayOffset, t.duration);
       } else if (t.after) {
         const pres = parseAfter(t.after);
@@ -224,34 +216,29 @@ export function buildHierarchy(computed: ComputedTask[]): HierarchyMap {
   return hierarchy;
 }
 
+/**
+ * Day range the timeline must cover: every scheduled bar, every milestone and today, plus some
+ * empty space on both sides. `now` is a parameter so tests can pin "today".
+ */
 export function computeTimelineBounds(
   computed: ComputedTask[],
   milestones: { date: string }[],
-  projectStart: Date
+  now: Date = new Date()
 ): { startDay: number; endDay: number } {
-  let minStart = Infinity;
-  let maxEnd = -Infinity;
-
+  const days: number[] = [todayOffset(now)];
   computed.forEach(t => {
-    if (!Number.isNaN(t.startDayOffset)) minStart = Math.min(minStart, t.startDayOffset);
-    if (!Number.isNaN(t.endDayOffset)) maxEnd = Math.max(maxEnd, t.endDayOffset);
+    if (Number.isFinite(t.startDayOffset)) days.push(t.startDayOffset);
+    if (Number.isFinite(t.endDayOffset)) days.push(t.endDayOffset);
   });
-
   milestones.forEach(ms => {
-    const d = Math.round((new Date(ms.date).getTime() - projectStart.getTime()) / MS_PER_DAY);
-    minStart = Math.min(minStart, d);
-    maxEnd = Math.max(maxEnd, d);
+    const d = dateToOffset(ms.date);
+    if (Number.isFinite(d)) days.push(d);
   });
 
-  const todayOff = Math.round((Date.now() - projectStart.getTime()) / MS_PER_DAY);
-  minStart = Math.min(minStart, todayOff);
-  maxEnd = Math.max(maxEnd, todayOff);
-
-  if (!isFinite(minStart)) minStart = 0;
-  if (!isFinite(maxEnd)) maxEnd = 90;
-
+  const minStart = days.reduce((a, b) => Math.min(a, b));
+  const maxEnd = days.reduce((a, b) => Math.max(a, b));
   return {
-    startDay: minStart - 30,
-    endDay: maxEnd + 60,
+    startDay: minStart - TIMELINE_PADDING_BEFORE,
+    endDay: maxEnd + TIMELINE_PADDING_AFTER,
   };
 }
