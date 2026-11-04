@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
 /** Errors the page reports (uncaught exceptions and console.error), e.g. React's hydration errors. */
@@ -185,6 +186,47 @@ test('edits are saved in the browser and survive a reload', async ({ page }) => 
   await expect(bar(page, 'p1a')).toHaveAttribute('aria-label', /2026\/03\/02/);
   await page.reload();
   await expect(bar(page, 'p1a')).toHaveAttribute('aria-label', /2026\/03\/02/);
+});
+
+test('importing a full backup asks before it replaces every project', async ({ page }, testInfo) => {
+  await openApp(page);
+  const project = (id: string, name: string) => ({
+    version: 1, id, name, createdAt: '2026-06-01T00:00:00Z', updatedAt: '2026-06-01T00:00:00Z',
+    state: {
+      tasks: [{ id: 'x1', phase: 'Phase 1 Plan', name: 'Plan', start: '2026-06-01', duration: 3, isCritical: false, status: 'planned' }],
+      milestones: [], currentFilter: 'ALL', zoomScale: 2, collapsedPhases: [], collapsedSubPhases: [],
+      timelineStartDay: 60, timelineEndDay: 200,
+    },
+  });
+  const backup = testInfo.outputPath('backup.json');
+  writeFileSync(backup, JSON.stringify({
+    version: 1, projects: [project('b1', 'Backup one'), project('b2', 'Backup two')],
+    activeProjectId: 'b1', preferences: { isDark: true, currentMode: 'visual' },
+  }));
+  const importBackup = async () => {
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'File', exact: true }).click();
+    await page.getByRole('menuitem', { name: /Import JSON/ }).click();
+    await (await chooser).setFiles(backup);
+  };
+  const projectName = () => page.locator('.project-chip-name').textContent();
+
+  // It used to replace every project straight away, with no way back.
+  await importBackup();
+  const dialog = page.getByRole('dialog', { name: 'Replace all projects?' });
+  await expect(dialog).toContainText('This backup has 2 project(s)');
+  await expect(dialog).toContainText('replaces the 1 project(s)');
+  await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  expect(await projectName()).toBe('Default Project');
+
+  await importBackup();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Replace all' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(dialog).toBeHidden();
+  await expect.poll(projectName).toBe('Backup one');
 });
 
 test('Excel export downloads an .xlsx named after the project', async ({ page }) => {

@@ -12,7 +12,7 @@ import {
   loadAppStorage,
   makeId,
   now,
-  parseImport,
+  type ImportedPayload,
   saveAppStorage,
   serializeState,
   withLiveState,
@@ -39,7 +39,11 @@ export interface ProjectsAPI {
   /** Download one project as .gantt.json without switching to it. */
   download: (id: string) => void;
   downloadAll: () => void;
-  importJsonText: (text: string) => Promise<{ kind: 'project' | 'app'; message: string }>;
+  /**
+   * Apply a file read with parseImport: a single project is added and opened; a full backup
+   * replaces every project (the caller asks the user first).
+   */
+  applyImport: (payload: ImportedPayload) => void;
 }
 
 export function usePersistentGanttState() {
@@ -320,10 +324,9 @@ export function usePersistentGanttState() {
       downloadAppStorage(withLiveState(storageRef.current, state));
     }, [state]),
 
-    importJsonText: useCallback(
-      async (text: string) => {
-        if (!storageRef.current) throw new Error('Storage not ready');
-        const parsed = parseImport(text);
+    applyImport: useCallback(
+      (parsed: ImportedPayload) => {
+        if (!storageRef.current) return;
         if (parsed.kind === 'project') {
           const incoming: ProjectFile = {
             ...parsed.project,
@@ -337,17 +340,11 @@ export function usePersistentGanttState() {
           };
           commitStorage(next);
           loadProjectIntoState(incoming);
-          return { kind: 'project' as const, message: `Imported "${incoming.name}"` };
+          return;
         }
-        // Full app storage — replace entire storage
-        const next: AppStorage = parsed.storage;
-        commitStorage(next);
-        const active = findActiveProject(next);
-        loadProjectIntoState(active);
-        return {
-          kind: 'app' as const,
-          message: `Imported ${next.projects.length} project(s)`,
-        };
+        // Full backup: replaces every project.
+        commitStorage(parsed.storage);
+        loadProjectIntoState(findActiveProject(parsed.storage));
       },
       [commitStorage, loadProjectIntoState]
     ),
