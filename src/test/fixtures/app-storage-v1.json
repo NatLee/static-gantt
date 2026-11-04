@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "projects": [
+    {
+      "version": 1,
+      "id": "6f1c2b9e-1d2a-4c51-9a0e-3d1b7c2f8a10",
+      "name": "Website relaunch",
+      "createdAt": "2026-06-01T08:00:00.000Z",
+      "updatedAt": "2026-06-05T09:30:00.000Z",
+      "state": {
+        "tasks": [
+          { "id": "p1a", "phase": "Phase 1 Discovery", "name": "Interviews", "start": "2026-06-01", "duration": 5, "isCritical": true, "status": "done", "progress": 100, "assignee": "Amy", "tags": ["research"], "color": "#0ea5e9", "description": "Talk to 8 customers" },
+          { "id": "p1b", "phase": "Phase 1 Discovery", "name": "Synthesis", "after": "p1a", "duration": 3, "isCritical": false, "status": "in-progress", "progress": 40 },
+          { "id": "p2a", "phase": "Phase 2 Build", "name": "Prototype", "after": "p1a,p1b", "duration": 10, "isCritical": true, "status": "planned" }
+        ],
+        "milestones": [
+          { "id": "ms1", "name": "Kickoff review", "date": "2026-06-12", "colorClass": "bg-cyan-500/20 text-cyan-300 border-cyan-500/40", "lineClass": "bg-cyan-500" }
+        ],
+        "currentFilter": "Phase 1",
+        "zoomScale": 2,
+        "collapsedPhases": [],
+        "collapsedSubPhases": ["Phase 2::Build"],
+        "timelineStartDay": 60,
+        "timelineEndDay": 200,
+        "workingDaysOnly": true,
+        "baseline": { "capturedAt": "2026-06-02T00:00:00.000Z", "bars": { "p1a": { "start": 92, "end": 97 } } }
+      }
+    },
+    {
+      "version": 1,
+      "id": "p0older",
+      "name": "Saved before working days and baselines existed",
+      "createdAt": "2026-04-20T08:00:00.000Z",
+      "updatedAt": "2026-04-20T08:00:00.000Z",
+      "state": {
+        "tasks": [
+          { "id": "a", "phase": "Phase 1 Plan", "name": "Plan", "start": "2026-04-20", "duration": 2, "isCritical": false, "status": "planned" }
+        ],
+        "milestones": [],
+        "currentFilter": "ALL",
+        "zoomScale": 1,
+        "collapsedPhases": [],
+        "collapsedSubPhases": [],
+        "timelineStartDay": 20,
+        "timelineEndDay": 120
+      }
+    }
+  ],
+  "activeProjectId": "6f1c2b9e-1d2a-4c51-9a0e-3d1b7c2f8a10",
+  "preferences": { "isDark": false, "currentMode": "visual" }
+}

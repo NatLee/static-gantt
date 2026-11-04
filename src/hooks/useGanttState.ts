@@ -31,7 +31,7 @@ const initialState: GanttState = {
   baseline: null,
 };
 
-function ganttReducer(state: GanttState, action: GanttAction): GanttState {
+export function ganttReducer(state: GanttState, action: GanttAction): GanttState {
   switch (action.type) {
     case 'SET_FILTER':
       return { ...state, currentFilter: action.filter };
