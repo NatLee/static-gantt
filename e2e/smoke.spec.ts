@@ -112,6 +112,37 @@ test('dragging a bar down one row puts it below its neighbour', async ({ page })
   await expect.poll(async () => (await savedOrder(page)).slice(4, 6)).toEqual(['p2b@Phase 2 UX', 'p2a@Phase 2 UX']);
 });
 
+/** Drag from the connector dot at the right end of `from` onto `to` (creates "to after from"). */
+async function connect(page: Page, from: string, to: string) {
+  await bar(page, from).scrollIntoViewIfNeeded();
+  await bar(page, from).hover();
+  const dot = (await page.locator(`[data-task-id="${from}"] ~ .bar-add-btn.right.dep`).first().boundingBox())!;
+  const target = (await bar(page, to).boundingBox())!;
+  await page.mouse.move(dot.x + dot.width / 2, dot.y + dot.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 12 });
+  await page.mouse.up();
+}
+
+const savedAfter = (page: Page, id: string) =>
+  page.evaluate(i => {
+    const saved = JSON.parse(localStorage.getItem('gantt-app-v1') ?? 'null');
+    return saved?.projects?.[0]?.state?.tasks?.find((t: { id: string }) => t.id === i)?.after ?? null;
+  }, id);
+
+test("dragging from a bar's connector dot draws a dependency, and refuses a cycle", async ({ page }) => {
+  await openApp(page);
+  // This never worked in the released version: the connect drag got tasks without row numbers
+  // and quietly gave up before drawing anything.
+  await connect(page, 'p1d', 'p2d');
+  await expect.poll(() => savedAfter(page, 'p2d')).toBe('p2c,p1d');
+
+  // p1a → … → p2a already; making p1a wait for p2a would be a cycle.
+  await connect(page, 'p2a', 'p1a');
+  await page.waitForTimeout(600);
+  expect(await savedAfter(page, 'p1a')).toBeNull();
+});
+
 test('menus open and close from the keyboard', async ({ page }) => {
   await openApp(page);
   const file = page.getByRole('button', { name: 'File', exact: true });

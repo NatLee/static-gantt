@@ -25,7 +25,6 @@ interface GanttPanelProps {
   dispatch: React.Dispatch<GanttAction>;
   computed: ComputedTask[];
   hierarchy: HierarchyMap;
-  taskMap: Map<string, ComputedTask>;
 }
 
 export default function GanttPanel({
@@ -33,7 +32,6 @@ export default function GanttPanel({
   dispatch,
   computed,
   hierarchy,
-  taskMap,
 }: GanttPanelProps) {
   const { t } = useI18n();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -73,6 +71,13 @@ export default function GanttPanel({
     () => computed.map(t => ({ ...t, rowIndex: rowIndexMap.get(t.id) })),
     [computed, rowIndexMap]
   );
+  // Tasks by id *with* their row. Connecting needs the source row to start the line; it was
+  // given the plain task map, where rowIndex is always undefined, so dragging from a bar's
+  // connector dot never started and no dependency could be drawn.
+  const rowTaskMap = useMemo(
+    () => new Map(computedWithRows.map(t => [t.id, t])),
+    [computedWithRows]
+  );
 
   const totalHeight = totalRows * ROW_HEIGHT;
 
@@ -96,7 +101,7 @@ export default function GanttPanel({
 
   const connect = useDragToConnect({
     tasks: state.tasks,
-    taskMap,
+    taskMap: rowTaskMap,
     dispatch,
     zoomScale: state.zoomScale,
     timelineStartDay: state.timelineStartDay,

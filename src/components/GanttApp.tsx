@@ -262,7 +262,6 @@ export default function GanttApp() {
               dispatch={dispatch}
               computed={computed}
               hierarchy={hierarchy}
-              taskMap={taskMap}
             />
           </RowHoverProvider>
         )
