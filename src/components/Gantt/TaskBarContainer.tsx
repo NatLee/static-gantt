@@ -2,7 +2,8 @@
 
 import React, { useRef, useCallback, useState } from 'react';
 import { ComputedTask, GanttState, GanttAction, HierarchyMap } from '@/types';
-import { offsetToDate, formatDate, formatISO } from '@/lib/dateUtils';
+import { offsetToDate, offsetToISO, formatDate } from '@/lib/dateUtils';
+import { endOffsetFor } from '@/lib/scheduler';
 import { PIXELS_PER_DAY, ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
 import { buildRowMap, findTaskDropRow, resolveTaskDropTarget, type RowItem } from '@/hooks/useDragReorder';
@@ -281,8 +282,10 @@ export default function TaskBarContainer({
           }
 
           if (pill) {
-            const newStart = offsetToDate(ds.origStartDayOffset + dayDelta);
-            const newEnd = offsetToDate(ds.origStartDayOffset + dayDelta + ds.origDuration - 1);
+            // Same end-date convention as the label next to the bar and the tooltip.
+            const startOffset = ds.origStartDayOffset + dayDelta;
+            const newStart = offsetToDate(startOffset);
+            const newEnd = offsetToDate(endOffsetFor(startOffset, ds.origDuration, state.workingDaysOnly));
             pill.textContent = `${formatDate(newStart)} → ${formatDate(newEnd)}`;
             pill.style.left = `${ev.clientX + 12}px`;
             pill.style.top = `${ev.clientY - 28}px`;
@@ -365,7 +368,7 @@ export default function TaskBarContainer({
           !!resolved && (phaseChanged || resolved.insertBeforeTaskId !== undefined);
 
         const newStartOffset = ds.origStartDayOffset + dayDelta;
-        const newDateISO = formatISO(offsetToDate(newStartOffset));
+        const newDateISO = offsetToISO(newStartOffset);
 
         if (reorder && resolved) {
           if (dayDelta !== 0) {
@@ -393,7 +396,7 @@ export default function TaskBarContainer({
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     },
-    [ppd, dispatch, hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases, computed, scrollContainerRef]
+    [ppd, dispatch, hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases, state.workingDaysOnly, scrollContainerRef]
   );
 
   const visibleTasks = computed.filter((t) => {

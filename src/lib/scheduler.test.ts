@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { annotateWorkload, buildHierarchy, computeSchedule } from './scheduler';
+import { annotateWorkload, buildHierarchy, computeSchedule, endOffsetFor } from './scheduler';
 import { defaultTasks } from '@/data/defaultProject';
 import { task } from '@/test/helpers';
 
@@ -48,6 +48,26 @@ describe('computeSchedule: forward pass', () => {
       task('a', { start: '2026-03-01', duration: 1 }),
     ]));
     expect(s.get('c')!.startDayOffset).toBe(2);
+  });
+
+  // The old forward pass gave up after 100 sweeps over the list; a chain stored in reverse order
+  // only advances one task per sweep, so everything past the 100th task vanished from the chart.
+  it('schedules long chains stored in reverse order', () => {
+    const chain = Array.from({ length: 300 }, (_, i) =>
+      task(`t${i}`, i === 0 ? { start: '2026-03-01', duration: 1 } : { after: `t${i - 1}`, duration: 1 }));
+    const out = computeSchedule([...chain].reverse());
+    expect(out.every(t => Number.isFinite(t.startDayOffset))).toBe(true);
+    expect(out.find(t => t.id === 't299')!.startDayOffset).toBe(299);
+    expect(out.find(t => t.id === 't0')!.isOnCriticalPath).toBe(true);
+    expect(out.find(t => t.id === 't0')!.totalFloat).toBe(0);
+  });
+
+  it('keeps a pinned start even when the task also lists predecessors', () => {
+    const s = byId(computeSchedule([
+      task('a', { start: '2026-03-01', duration: 10 }),
+      task('b', { start: '2026-03-03', after: 'a', duration: 1 }),
+    ]));
+    expect(s.get('b')!.startDayOffset).toBe(2);
   });
 
   it('leaves tasks with a missing predecessor unscheduled (NaN) instead of throwing', () => {
@@ -102,6 +122,14 @@ describe('computeSchedule: critical path', () => {
     // gives this chain. p4a waits for both p3b (ends day 36) and p3c (ends day 45), so the
     // design branch through p3c drives it and the backend branch p1c → p3a → p3b has float.
     expect(critical).toEqual(['p1a', 'p1b', 'p2a', 'p2b', 'p2c', 'p3c', 'p4a', 'p4b', 'p4c', 'p5a', 'p5b', 'p5c']);
+  });
+});
+
+describe('endOffsetFor', () => {
+  it('adds calendar days, or working days stretched over weekends', () => {
+    // Offset 5 is Friday 2026-03-06.
+    expect(endOffsetFor(5, 3)).toBe(8);
+    expect(endOffsetFor(5, 3, true)).toBe(10);
   });
 });
 

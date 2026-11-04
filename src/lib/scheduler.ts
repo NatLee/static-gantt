@@ -30,139 +30,148 @@ function nextWorkingDay(offset: number): number {
   return o;
 }
 
+/**
+ * Exclusive end offset of a bar that starts at `start` and lasts `duration` days. In working-day
+ * mode the bar stretches over the weekends it crosses. Shared with the drag preview so the label
+ * shown while dragging matches where the bar lands.
+ */
+export function endOffsetFor(start: number, duration: number, workingDaysOnly = false): number {
+  return workingDaysOnly ? addWorkingDays(start, duration) : start + duration;
+}
+
+function unscheduled(t: Task): ComputedTask {
+  return {
+    ...t,
+    startDayOffset: NaN,
+    endDayOffset: NaN,
+    lateStartDayOffset: NaN,
+    lateEndDayOffset: NaN,
+    totalFloat: NaN,
+    isOnCriticalPath: false,
+  };
+}
+
+/**
+ * Schedule every task. A task with `start` is pinned to that day; a task with `after` starts when
+ * its last predecessor ends. Tasks whose predecessors are missing or form a cycle cannot be placed
+ * and keep NaN offsets (the chart skips them).
+ *
+ * Both passes walk the dependency graph in topological order (Kahn's algorithm), so the result is
+ * the same however the task list is ordered and however long the chains are.
+ */
 export function computeSchedule(tasks: Task[], opts: ScheduleOptions = {}): ComputedTask[] {
   const workingDaysOnly = !!opts.workingDaysOnly;
-  const taskMap: Record<string, ComputedTask> = {};
-  tasks.forEach(t => {
-    taskMap[t.id] = {
-      ...t,
-      startDayOffset: NaN,
-      endDayOffset: NaN,
-      lateStartDayOffset: NaN,
-      lateEndDayOffset: NaN,
-      totalFloat: NaN,
-      isOnCriticalPath: false,
-    };
+  const taskMap = new Map<string, ComputedTask>();
+  tasks.forEach(t => taskMap.set(t.id, unscheduled(t)));
+
+  // ---- Forward pass: earliest start / finish ----
+  // waitingOn[id] = predecessors not placed yet; dependents[pred] = tasks waiting for pred.
+  const waitingOn = new Map<string, number>();
+  const dependents = new Map<string, string[]>();
+  const ready: ComputedTask[] = [];
+  taskMap.forEach(t => {
+    if (t.start) {
+      ready.push(t);
+      return;
+    }
+    const preds = parseAfter(t.after);
+    if (preds.length === 0) return; // nothing to anchor it: stays unscheduled
+    waitingOn.set(t.id, preds.length);
+    preds.forEach(pid => {
+      if (!dependents.has(pid)) dependents.set(pid, []);
+      dependents.get(pid)!.push(t.id);
+    });
   });
 
-  const endFor = (start: number, duration: number) =>
-    workingDaysOnly ? addWorkingDays(start, duration) : start + duration;
-
-  // ---- Forward pass (earliest start/finish), iterative fixed point ----
-  let done = false;
-  let loops = 0;
-  while (!done && loops < 100) {
-    done = true;
-    for (const id in taskMap) {
-      const t = taskMap[id];
-      if (!Number.isNaN(t.startDayOffset)) continue;
-
-      if (t.start) {
-        t.startDayOffset = dateToOffset(t.start);
-        t.endDayOffset = endFor(t.startDayOffset, t.duration);
-      } else if (t.after) {
-        const pres = parseAfter(t.after);
-        let mx = -Infinity;
-        let ok = true;
-        for (const pid of pres) {
-          const p = taskMap[pid];
-          if (p && !Number.isNaN(p.endDayOffset)) {
-            mx = Math.max(mx, p.endDayOffset);
-          } else {
-            ok = false;
-            break;
-          }
-        }
-        if (ok && isFinite(mx)) {
-          t.startDayOffset = workingDaysOnly ? nextWorkingDay(mx) : mx;
-          t.endDayOffset = endFor(t.startDayOffset, t.duration);
-        } else {
-          done = false;
-        }
-      }
+  while (ready.length > 0) {
+    const t = ready.shift()!;
+    if (t.start) {
+      t.startDayOffset = dateToOffset(t.start);
+    } else {
+      const latestEnd = Math.max(...parseAfter(t.after).map(pid => taskMap.get(pid)!.endDayOffset));
+      t.startDayOffset = workingDaysOnly ? nextWorkingDay(latestEnd) : latestEnd;
     }
-    loops++;
+    t.endDayOffset = endOffsetFor(t.startDayOffset, t.duration, workingDaysOnly);
+    if (!Number.isFinite(t.endDayOffset)) continue; // e.g. an unreadable start date
+
+    (dependents.get(t.id) ?? []).forEach(sid => {
+      const left = waitingOn.get(sid)! - 1;
+      waitingOn.set(sid, left);
+      if (left === 0) ready.push(taskMap.get(sid)!);
+    });
   }
 
   computeCriticalPath(taskMap);
 
-  return tasks.map(t => taskMap[t.id]);
+  return tasks.map(t => taskMap.get(t.id)!);
 }
 
 // ---- Backward pass: latest start/finish, total float, critical path ----
-function computeCriticalPath(taskMap: Record<string, ComputedTask>): void {
+function computeCriticalPath(taskMap: Map<string, ComputedTask>): void {
+  const scheduled = [...taskMap.values()].filter(t => Number.isFinite(t.endDayOffset));
+  if (scheduled.length === 0) return;
+
   // Project end = latest earliest-finish among all scheduled tasks.
-  let projectEnd = -Infinity;
-  for (const id in taskMap) {
-    const e = taskMap[id].endDayOffset;
-    if (Number.isFinite(e)) projectEnd = Math.max(projectEnd, e);
-  }
-  if (!Number.isFinite(projectEnd)) return; // nothing scheduled
+  const projectEnd = scheduled.reduce((m, t) => Math.max(m, t.endDayOffset), -Infinity);
 
-  // successors[predId] = [ids of tasks that depend on predId]
-  const successors: Record<string, string[]> = {};
-  for (const id in taskMap) {
-    parseAfter(taskMap[id].after).forEach(pid => {
-      (successors[pid] ||= []).push(id);
+  // successors[pred] = scheduled tasks that list pred in `after`
+  const successors = new Map<string, ComputedTask[]>();
+  scheduled.forEach(t => {
+    parseAfter(t.after).forEach(pid => {
+      if (!successors.has(pid)) successors.set(pid, []);
+      successors.get(pid)!.push(t);
     });
-  }
+  });
 
-  let done = false;
-  let loops = 0;
-  while (!done && loops < 200) {
-    done = true;
-    for (const id in taskMap) {
-      const t = taskMap[id];
-      if (!Number.isFinite(t.endDayOffset)) continue;
-      if (Number.isFinite(t.lateEndDayOffset)) continue;
+  // A task's late finish is known once every successor's late start is known.
+  const pending = new Map<string, number>();
+  const ready: ComputedTask[] = [];
+  scheduled.forEach(t => {
+    const n = successors.get(t.id)?.length ?? 0;
+    pending.set(t.id, n);
+    if (n === 0) ready.push(t);
+  });
 
-      const succs = (successors[id] || []).filter(sid => Number.isFinite(taskMap[sid]?.endDayOffset));
-      let late: number;
-      if (succs.length === 0) {
-        late = projectEnd;
-      } else {
-        let mn = Infinity;
-        let ready = true;
-        for (const sid of succs) {
-          const ls = taskMap[sid].lateStartDayOffset;
-          if (!Number.isFinite(ls)) { ready = false; break; }
-          mn = Math.min(mn, ls);
-        }
-        if (!ready) { done = false; continue; }
-        late = mn;
-      }
-      const span = t.endDayOffset - t.startDayOffset;
-      t.lateEndDayOffset = late;
-      t.lateStartDayOffset = late - span;
-      // Round away tiny fp noise; clamp negatives to 0 so weekend gaps don't
-      // read as negative slack.
-      t.totalFloat = Math.max(0, Math.round(t.lateStartDayOffset - t.startDayOffset));
-    }
-    loops++;
+  while (ready.length > 0) {
+    const t = ready.shift()!;
+    const succs = successors.get(t.id) ?? [];
+    const late = succs.length === 0 ? projectEnd : Math.min(...succs.map(s => s.lateStartDayOffset));
+    const span = t.endDayOffset - t.startDayOffset;
+    t.lateEndDayOffset = late;
+    t.lateStartDayOffset = late - span;
+    // Clamp negatives to 0 so weekend gaps don't read as negative slack.
+    t.totalFloat = Math.max(0, Math.round(t.lateStartDayOffset - t.startDayOffset));
+
+    parseAfter(t.after).forEach(pid => {
+      if (!pending.has(pid)) return;
+      const left = pending.get(pid)! - 1;
+      pending.set(pid, left);
+      if (left === 0) ready.push(taskMap.get(pid)!);
+    });
   }
 
   // Critical path via driving-edge propagation: start from the latest finishers
   // and walk backward through the predecessor that actually drives each task's
   // start (the one with the maximum end). This stays a single contiguous chain
   // in both calendar and working-day mode (float==0 breaks across weekends).
-  const stack: string[] = [];
-  for (const id in taskMap) {
-    if (taskMap[id].endDayOffset === projectEnd) {
-      taskMap[id].isOnCriticalPath = true;
-      stack.push(id);
+  const stack: ComputedTask[] = [];
+  scheduled.forEach(t => {
+    if (t.endDayOffset === projectEnd) {
+      t.isOnCriticalPath = true;
+      stack.push(t);
     }
-  }
+  });
   while (stack.length) {
-    const t = taskMap[stack.pop()!];
+    const t = stack.pop()!;
     const preds = parseAfter(t.after)
-      .filter(pid => taskMap[pid] && Number.isFinite(taskMap[pid].endDayOffset));
+      .map(pid => taskMap.get(pid))
+      .filter((p): p is ComputedTask => !!p && Number.isFinite(p.endDayOffset));
     if (preds.length === 0) continue;
-    let maxEnd = -Infinity;
-    preds.forEach(pid => { maxEnd = Math.max(maxEnd, taskMap[pid].endDayOffset); });
-    preds.forEach(pid => {
-      if (taskMap[pid].endDayOffset === maxEnd && !taskMap[pid].isOnCriticalPath) {
-        taskMap[pid].isOnCriticalPath = true;
-        stack.push(pid);
+    const maxEnd = Math.max(...preds.map(p => p.endDayOffset));
+    preds.forEach(p => {
+      if (p.endDayOffset === maxEnd && !p.isOnCriticalPath) {
+        p.isOnCriticalPath = true;
+        stack.push(p);
       }
     });
   }
