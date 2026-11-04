@@ -16,8 +16,8 @@ import { ROW_HEIGHT, PIXELS_PER_DAY, Z } from '@/lib/ganttLayout';
 import { useResizableSidebar } from '@/hooks/useResizableSidebar';
 import { useVirtualRows } from '@/hooks/useVirtualRows';
 import { useDragToConnect } from '@/hooks/useDragToConnect';
+import { buildRowMap } from '@/hooks/useDragReorder';
 import { buildDepPath, buildArrowHead } from '@/lib/depPath';
-import { subPhaseKey } from '@/lib/phase';
 import { useI18n } from '@/i18n/I18nProvider';
 
 interface GanttPanelProps {
@@ -26,67 +26,6 @@ interface GanttPanelProps {
   computed: ComputedTask[];
   hierarchy: HierarchyMap;
   taskMap: Map<string, ComputedTask>;
-}
-
-function computeRowIndexMap(
-  hierarchy: HierarchyMap,
-  currentFilter: string,
-  collapsedPhases: Set<string>,
-  collapsedSubPhases: Set<string>
-): Map<string, number> {
-  const map = new Map<string, number>();
-  let rowIndex = 0;
-  const masters = Object.keys(hierarchy);
-
-  masters.forEach((master) => {
-    if (currentFilter !== 'ALL' && currentFilter !== master) return;
-    rowIndex++; // Phase header
-    if (collapsedPhases.has(master)) return;
-    const subs = hierarchy[master];
-    Object.keys(subs).forEach((sub) => {
-      rowIndex++; // Sub-phase header
-      const collapseKey = subPhaseKey(master, sub);
-      if (collapsedSubPhases.has(collapseKey)) return;
-      subs[sub].forEach((task) => {
-        map.set(task.id, rowIndex);
-        rowIndex++;
-      });
-    });
-  });
-
-  return map;
-}
-
-function countTotalRows(
-  hierarchy: HierarchyMap,
-  currentFilter: string,
-  collapsedPhases: Set<string>,
-  collapsedSubPhases: Set<string>
-): number {
-  let count = 0;
-  const masters = Object.keys(hierarchy);
-
-  masters.forEach((master) => {
-    if (currentFilter !== 'ALL' && currentFilter !== master) return;
-
-    count++; // Phase header row
-
-    if (collapsedPhases.has(master)) return;
-
-    const subs = hierarchy[master];
-    const subKeys = Object.keys(subs);
-
-    subKeys.forEach((sub) => {
-      count++; // Sub-phase header row
-
-      const collapseKey = subPhaseKey(master, sub);
-      if (collapsedSubPhases.has(collapseKey)) return;
-
-      count += subs[sub].length; // Task rows
-    });
-  });
-
-  return count;
 }
 
 export default function GanttPanel({
@@ -114,15 +53,21 @@ export default function GanttPanel({
   const totalDays = state.timelineEndDay - state.timelineStartDay;
   const totalWidth = totalDays * ppd;
 
-  const totalRows = useMemo(
-    () => countTotalRows(hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases),
+  // One row list (phase, sub-phase and task rows after filter and collapse) drives the row
+  // count, each task's row and the drag-and-drop targets, so they can't disagree.
+  const rowMap = useMemo(
+    () => buildRowMap(hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases),
     [hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases]
   );
+  const totalRows = rowMap.length;
 
-  const rowIndexMap = useMemo(
-    () => computeRowIndexMap(hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases),
-    [hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases]
-  );
+  const rowIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    rowMap.forEach((row, i) => {
+      if (row.taskId) map.set(row.taskId, i);
+    });
+    return map;
+  }, [rowMap]);
 
   const computedWithRows = useMemo(
     () => computed.map(t => ({ ...t, rowIndex: rowIndexMap.get(t.id) })),
