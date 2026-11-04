@@ -4,6 +4,7 @@ import React from 'react';
 import { HierarchyMap } from '@/types';
 import { ROW_HEIGHT } from '@/lib/ganttLayout';
 import { hueFromString } from '@/lib/colorHash';
+import { subPhaseKey } from '@/lib/phase';
 
 interface PhaseBackgroundBandsProps {
   hierarchy: HierarchyMap;
@@ -65,7 +66,7 @@ export default function PhaseBackgroundBands({
       );
       rowIndex++;
 
-      const collapseKey = `${master}::${sub}`;
+      const collapseKey = subPhaseKey(master, sub);
       if (collapsedSubPhases.has(collapseKey)) return;
       rowIndex += subs[sub].length;
     });

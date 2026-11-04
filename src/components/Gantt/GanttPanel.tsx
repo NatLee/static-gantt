@@ -17,6 +17,7 @@ import { useResizableSidebar } from '@/hooks/useResizableSidebar';
 import { useVirtualRows } from '@/hooks/useVirtualRows';
 import { useDragToConnect } from '@/hooks/useDragToConnect';
 import { buildDepPath, buildArrowHead } from '@/lib/depPath';
+import { subPhaseKey } from '@/lib/phase';
 import { useI18n } from '@/i18n/I18nProvider';
 
 interface GanttPanelProps {
@@ -44,7 +45,7 @@ function computeRowIndexMap(
     const subs = hierarchy[master];
     Object.keys(subs).forEach((sub) => {
       rowIndex++; // Sub-phase header
-      const collapseKey = `${master}::${sub}`;
+      const collapseKey = subPhaseKey(master, sub);
       if (collapsedSubPhases.has(collapseKey)) return;
       subs[sub].forEach((task) => {
         map.set(task.id, rowIndex);
@@ -78,7 +79,7 @@ function countTotalRows(
     subKeys.forEach((sub) => {
       count++; // Sub-phase header row
 
-      const collapseKey = `${master}::${sub}`;
+      const collapseKey = subPhaseKey(master, sub);
       if (collapsedSubPhases.has(collapseKey)) return;
 
       count += subs[sub].length; // Task rows

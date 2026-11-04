@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { Edit, FolderMinus, FolderPlus, Plus, Trash2 } from 'lucide-react';
 import { GanttAction } from '@/types';
 import { useI18n } from '@/i18n/I18nProvider';
+import { subPhaseKey } from '@/lib/phase';
 
 interface Props {
   kind: 'phase' | 'sub-phase';
@@ -99,7 +100,7 @@ export default function PhaseContextMenu({
       } else if (subPhase) {
         dispatch({
           type: 'TOGGLE_SUB_PHASE_COLLAPSE',
-          key: `${masterPhase}::${subPhase}`,
+          key: subPhaseKey(masterPhase, subPhase),
         });
       }
     });

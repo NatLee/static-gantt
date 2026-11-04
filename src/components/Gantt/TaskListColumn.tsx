@@ -7,6 +7,7 @@ import { useDragReorder, DragSource } from '@/hooks/useDragReorder';
 import { useRowHover } from '@/hooks/useRowHover';
 import { ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import { hueFromString } from '@/lib/colorHash';
+import { joinPhase, subPhaseKey } from '@/lib/phase';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
 import TaskContextMenu from './TaskContextMenu';
 import PhaseContextMenu from './PhaseContextMenu';
@@ -198,7 +199,7 @@ export default function TaskListColumn({
     const subKeys = Object.keys(subs);
 
     subKeys.forEach((sub) => {
-      const collapseKey = `${master}::${sub}`;
+      const collapseKey = subPhaseKey(master, sub);
       const isSubCollapsed = collapsedSubPhases.has(collapseKey);
       const tasks = subs[sub];
 
@@ -392,7 +393,7 @@ export default function TaskListColumn({
                 type: 'OPEN_DIALOG',
                 dialog: {
                   type: 'add-task',
-                  context: { phase: `${master} ${sub}` },
+                  context: { phase: joinPhase(master, sub) },
                 },
               })
             }

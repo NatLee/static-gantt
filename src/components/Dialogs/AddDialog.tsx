@@ -4,6 +4,7 @@ import { Dispatch, useEffect, useState, useRef, useCallback } from 'react';
 import { GanttState, GanttAction, Task } from '@/types';
 import { genId, formatISO } from '@/lib/dateUtils';
 import { MS_COLORS } from '@/data/defaultProject';
+import { DEFAULT_SUB_PHASE, joinPhase, masterOf } from '@/lib/phase';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { TFunction } from '@/i18n/I18nProvider';
 
@@ -93,10 +94,10 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
     switch (dialog.type) {
       case 'add-phase': {
         const lastId = findLastTaskId();
-        const sub = subPhaseName.trim() || 'General';
+        const sub = subPhaseName.trim() || DEFAULT_SUB_PHASE;
         const newTask: Task = {
           id: genId(),
-          phase: `${phaseName.trim() || 'Phase'} ${sub}`,
+          phase: joinPhase(phaseName.trim() || 'Phase', sub),
           name: taskName.trim() || t('default.newTask'),
           duration: Math.max(1, duration),
           status: 'planned',
@@ -112,15 +113,12 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
 
       case 'add-sub-phase': {
         const masterPhase = dialog.context.masterPhase;
-        // Match only tasks within THIS master phase. Using a bare prefix would
-        // let "Phase 1" also match "Phase 10", "Phase 11", … — use a boundary.
-        const inMaster = (t: Task) =>
-          t.phase === masterPhase || t.phase.startsWith(`${masterPhase} `);
+        const inMaster = (t: Task) => masterOf(t.phase) === masterPhase;
         const lastId = findLastTaskId(inMaster);
         const lastIdx = findLastTaskIndex(inMaster);
         const newTask: Task = {
           id: genId(),
-          phase: `${masterPhase} ${subPhaseName.trim() || 'General'}`,
+          phase: joinPhase(masterPhase, subPhaseName.trim() || DEFAULT_SUB_PHASE),
           name: taskName.trim() || t('default.newTask'),
           duration: Math.max(1, duration),
           status: 'planned',
@@ -140,15 +138,13 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         if (!fullPhase && dialog.context.masterPhase) {
           const m = dialog.context.masterPhase;
           if (dialog.context.subPhase) {
-            fullPhase = `${m} ${dialog.context.subPhase}`;
+            fullPhase = joinPhase(m, dialog.context.subPhase);
           } else {
-            const firstInMaster = state.tasks.find(
-              t => t.phase === m || t.phase.startsWith(`${m} `)
-            );
-            fullPhase = firstInMaster ? firstInMaster.phase : `${m} General`;
+            const firstInMaster = state.tasks.find(t => masterOf(t.phase) === m);
+            fullPhase = firstInMaster ? firstInMaster.phase : joinPhase(m, DEFAULT_SUB_PHASE);
           }
         }
-        if (!fullPhase) fullPhase = 'Phase 1 General';
+        if (!fullPhase) fullPhase = joinPhase('Phase 1', DEFAULT_SUB_PHASE);
 
         const afterTaskId = dialog.context.afterTaskId;
         // Find last task in this phase to link after

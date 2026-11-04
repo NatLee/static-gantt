@@ -9,6 +9,7 @@ import { buildRowMap, findTaskDropRow, resolveTaskDropTarget, type RowItem } fro
 import type { ConnectDirection } from '@/hooks/useDragToConnect';
 import { useRowHover } from '@/hooks/useRowHover';
 import { updateDepsForTask } from '@/lib/depLineLive';
+import { splitPhase } from '@/lib/phase';
 import { createAutoScroll, computeEdgeScrollSpeed } from '@/lib/autoScroll';
 import { AlertTriangle } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -150,9 +151,7 @@ export default function TaskBarContainer({
       const depSvg =
         (document.querySelector('svg[data-role="dep-svg"]') as SVGSVGElement | null) ?? null;
 
-      const phaseMatch = task.phase.match(/^(Phase \d+)\s+(.*)/);
-      const sourceMaster = phaseMatch?.[1] ?? '';
-      const sourceSub = phaseMatch?.[2];
+      const { master: sourceMaster, sub: sourceSub } = splitPhase(task.phase);
 
       didDragBarRef.current = false;
       dragState.current = {

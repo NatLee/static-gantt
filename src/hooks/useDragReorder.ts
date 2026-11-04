@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { GanttState, GanttAction, HierarchyMap } from '@/types';
 import { ROW_HEIGHT } from '@/lib/ganttLayout';
 import { createAutoScroll, computeEdgeScrollSpeed } from '@/lib/autoScroll';
+import { joinPhase, subPhaseKey } from '@/lib/phase';
 
 export type RowItemType = 'phase' | 'sub-phase' | 'task';
 
@@ -45,8 +46,7 @@ export function buildRowMap(
     Object.keys(subs).forEach((sub) => {
       rowMap.push({ type: 'sub-phase', masterPhase: master, subPhase: sub });
 
-      const collapseKey = `${master}::${sub}`;
-      if (collapsedSubPhases.has(collapseKey)) return;
+      if (collapsedSubPhases.has(subPhaseKey(master, sub))) return;
 
       subs[sub].forEach((task) => {
         rowMap.push({ type: 'task', masterPhase: master, subPhase: sub, taskId: task.id });
@@ -518,7 +518,7 @@ export function resolveTaskDropTarget(
   }
 
   if (!targetMaster || !targetSub) return null;
-  return { targetPhase: `${targetMaster} ${targetSub}`, insertBeforeTaskId };
+  return { targetPhase: joinPhase(targetMaster, targetSub), insertBeforeTaskId };
 }
 
 function dispatchTaskReorder(

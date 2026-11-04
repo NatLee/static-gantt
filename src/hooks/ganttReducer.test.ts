@@ -97,3 +97,51 @@ describe('ganttReducer: baseline', () => {
     expect(s.baseline!.bars).toEqual({ a: { start: 2, end: 4 } });
   });
 });
+
+// Sections imported from Mermaid usually have no "Phase N" prefix ("Marketing"). They are shown as
+// sub-phases of "Other"; these used to be renamed to "Other Marketing" by every edit that rebuilt
+// the phase string by hand.
+describe('ganttReducer: phases without a "Phase N" prefix', () => {
+  const tasks = [
+    task('m1', { phase: 'Marketing' }),
+    task('p1', { phase: 'Phase 1 Plan' }),
+    task('s1', { phase: 'Sales' }),
+  ];
+
+  it('RENAME_SUB_PHASE renames the section itself', () => {
+    const s = ganttReducer(stateWith(tasks), { type: 'RENAME_SUB_PHASE', masterPhase: 'Other', oldSub: 'Marketing', newSub: 'Growth' });
+    expect(find(s, 'm1').phase).toBe('Growth');
+  });
+
+  it('DELETE_SUB_PHASE deletes the section', () => {
+    const s = ganttReducer(stateWith(tasks), { type: 'DELETE_SUB_PHASE', masterPhase: 'Other', subPhase: 'Sales' });
+    expect(s.tasks.map(t => t.id)).toEqual(['m1', 'p1']);
+  });
+
+  it('MOVE_SUB_PHASE in and out of a numbered phase keeps the section name', () => {
+    let s = ganttReducer(stateWith(tasks), { type: 'MOVE_SUB_PHASE', subPhase: 'Marketing', sourceMasterPhase: 'Other', targetMasterPhase: 'Phase 1' });
+    expect(find(s, 'm1').phase).toBe('Phase 1 Marketing');
+    s = ganttReducer(s, { type: 'MOVE_SUB_PHASE', subPhase: 'Plan', sourceMasterPhase: 'Phase 1', targetMasterPhase: 'Other' });
+    expect(find(s, 'p1').phase).toBe('Plan');
+  });
+
+  it('REORDER_PHASES moves the Other group like any other phase', () => {
+    const s = ganttReducer(stateWith(tasks), { type: 'REORDER_PHASES', orderedPhases: ['Other', 'Phase 1'] });
+    expect(s.tasks.map(t => t.id)).toEqual(['m1', 's1', 'p1']);
+  });
+
+  it('REORDER_SUB_PHASES reorders sections inside Other', () => {
+    const s = ganttReducer(stateWith(tasks), { type: 'REORDER_SUB_PHASES', masterPhase: 'Other', orderedSubPhases: ['Sales', 'Marketing'] });
+    expect(s.tasks.map(t => t.id)).toEqual(['s1', 'm1', 'p1']);
+  });
+
+  it('COLLAPSE_ALL_PHASES also collapses Other, and only phases that are shown', () => {
+    const s = ganttReducer(stateWith([...tasks, task('x', { phase: 'Phase 3' })]), { type: 'COLLAPSE_ALL_PHASES' });
+    expect([...s.collapsedPhases].sort()).toEqual(['Other', 'Phase 1']);
+  });
+
+  it('RENAME_PHASE of Other gives its sections a numbered prefix', () => {
+    const s = ganttReducer(stateWith(tasks), { type: 'RENAME_PHASE', oldName: 'Other', newName: 'Phase 2' });
+    expect(s.tasks.map(t => t.phase)).toEqual(['Phase 2 Marketing', 'Phase 1 Plan', 'Phase 2 Sales']);
+  });
+});

@@ -1,5 +1,6 @@
 import { Task, ComputedTask, HierarchyMap } from '@/types';
 import { PROJECT_START_DATE } from '@/data/defaultProject';
+import { splitPhase } from '@/lib/phase';
 
 const MS_PER_DAY = 86400000;
 
@@ -219,13 +220,7 @@ export function annotateWorkload(computed: ComputedTask[]): ComputedTask[] {
 export function buildHierarchy(computed: ComputedTask[]): HierarchyMap {
   const hierarchy: HierarchyMap = {};
   computed.forEach(t => {
-    // Defensive: never assume `phase` is a non-empty string. A malformed task
-    // (e.g. created without a phase, or from a bad import) must not crash the
-    // entire chart render.
-    const phase = t.phase || 'Other';
-    const m = phase.match(/^(Phase \d+)\s+(.*)/);
-    const master = m ? m[1].trim() : 'Other';
-    const sub = m ? m[2].trim() : phase;
+    const { master, sub } = splitPhase(t.phase);
     if (!hierarchy[master]) hierarchy[master] = {};
     if (!hierarchy[master][sub]) hierarchy[master][sub] = [];
     hierarchy[master][sub].push(t);

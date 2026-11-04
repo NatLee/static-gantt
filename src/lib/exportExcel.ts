@@ -1,6 +1,7 @@
 import { ComputedTask } from '@/types';
 import { PROJECT_START_DATE } from '@/data/defaultProject';
 import { formatISO } from './dateUtils';
+import { masterOf } from './phase';
 
 const MS_PER_DAY = 86400000;
 
@@ -10,9 +11,7 @@ export async function exportToExcel(tasks: ComputedTask[], filter: string) {
   const data: Record<string, string | number | boolean>[] = [];
 
   tasks.forEach(t => {
-    const m = t.phase.match(/^(Phase \d+)/);
-    const mp = m ? m[1].trim() : 'Other';
-    if (filter !== 'ALL' && mp !== filter) return;
+    if (filter !== 'ALL' && masterOf(t.phase) !== filter) return;
 
     const sd = new Date(PROJECT_START_DATE.getTime() + t.startDayOffset * MS_PER_DAY);
     const ed = new Date(PROJECT_START_DATE.getTime() + t.endDayOffset * MS_PER_DAY);
