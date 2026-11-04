@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { GanttState, GanttAction, HierarchyMap } from '@/types';
 import { ROW_HEIGHT } from '@/lib/ganttLayout';
 import { createAutoScroll, computeEdgeScrollSpeed } from '@/lib/autoScroll';
+import { joinPhase, subPhaseKey } from '@/lib/phase';
 
 export type RowItemType = 'phase' | 'sub-phase' | 'task';
 
@@ -19,6 +20,20 @@ export interface DragSource {
   masterPhase: string;
   subPhase?: string;
   taskId?: string;
+}
+
+/** Marks the element whose top edge is row 0 of the task list (set by TaskListColumn). */
+export const TASK_LIST_ROWS_ATTR = 'data-task-list-rows';
+
+/**
+ * The task list's row container. Drop targets are computed from the pointer's distance to its top
+ * edge, so this must be the element the rows are positioned in. It used to be found as "the second
+ * child of .sticky-col", which became the sidebar's resize handle when the layout changed; every
+ * drop then landed one row too low (a sideways drag could even move a task into the next
+ * sub-phase).
+ */
+export function taskListRowsEl(scrollEl: ParentNode | null): HTMLElement | null {
+  return scrollEl?.querySelector<HTMLElement>(`[${TASK_LIST_ROWS_ATTR}]`) ?? null;
 }
 
 /**
@@ -45,8 +60,7 @@ export function buildRowMap(
     Object.keys(subs).forEach((sub) => {
       rowMap.push({ type: 'sub-phase', masterPhase: master, subPhase: sub });
 
-      const collapseKey = `${master}::${sub}`;
-      if (collapsedSubPhases.has(collapseKey)) return;
+      if (collapsedSubPhases.has(subPhaseKey(master, sub))) return;
 
       subs[sub].forEach((task) => {
         rowMap.push({ type: 'task', masterPhase: master, subPhase: sub, taskId: task.id });
@@ -150,11 +164,7 @@ export function useDragReorder(
       const scrollEl = scrollContainerRef.current;
       if (!scrollEl) return;
 
-      const listColEl = scrollEl.querySelector('.sticky-col');
-      if (!listColEl) return;
-
-      // The task list area starts after the header (52px)
-      const listAreaEl = listColEl.children[1] as HTMLElement; // TaskListColumn container
+      const listAreaEl = taskListRowsEl(scrollEl);
       if (!listAreaEl) return;
       const listRect = listAreaEl.getBoundingClientRect();
 
@@ -332,46 +342,37 @@ function findSubPhaseDropRow(
   return dropRow;
 }
 
+/**
+ * The gap (index into rowMap: "in front of row N") a task would go to with the pointer at
+ * `relativeY` over `hoveredRow`, or null where tasks can't be dropped (a phase without an open
+ * sub-phase). Over a task row the upper half means "above it", the lower half "below it".
+ */
+export function taskDropGap(hoveredRow: number, relativeY: number, rowMap: RowItem[]): number | null {
+  const inTopHalf = (relativeY % ROW_HEIGHT) < ROW_HEIGHT / 2;
+  const hoveredItem = rowMap[hoveredRow];
+  if (!hoveredItem) return null;
+  if (hoveredItem.type === 'task') return inTopHalf ? hoveredRow : hoveredRow + 1;
+  // Over a sub-phase header: first task of that sub-phase.
+  if (hoveredItem.type === 'sub-phase') return hoveredRow + 1;
+  // Over a phase header: first task of its first sub-phase.
+  if (rowMap[hoveredRow + 1]?.type === 'sub-phase') return hoveredRow + 2;
+  return null;
+}
+
+/** True when dropping into `gap` would leave the task exactly where it is. */
+export function isOwnSlot(gap: number, rowMap: RowItem[], source: DragSource): boolean {
+  return rowMap[gap]?.taskId === source.taskId || rowMap[gap - 1]?.taskId === source.taskId;
+}
+
+/** The gap a dragged task would move to, or null when it would not move. */
 export function findTaskDropRow(
   hoveredRow: number,
   relativeY: number,
   rowMap: RowItem[],
   source: DragSource,
 ): number | null {
-  const inTopHalf = (relativeY % ROW_HEIGHT) < ROW_HEIGHT / 2;
-  const hoveredItem = rowMap[hoveredRow];
-  if (!hoveredItem) return null;
-
-  // Tasks can only be dropped among task rows or right after a sub-phase header
-  if (hoveredItem.type === 'task') {
-    const dropRow = inTopHalf ? hoveredRow : hoveredRow + 1;
-    // Don't drop on self (same position)
-    if (hoveredItem.taskId === source.taskId) return null;
-    // Check if dropping right after self
-    if (!inTopHalf && hoveredRow + 1 < rowMap.length) {
-      const nextItem = rowMap[hoveredRow + 1];
-      if (nextItem?.taskId === source.taskId) return null;
-    }
-    if (inTopHalf && hoveredRow > 0) {
-      const prevItem = rowMap[hoveredRow - 1];
-      if (prevItem?.taskId === source.taskId) return null;
-    }
-    return dropRow;
-  }
-
-  if (hoveredItem.type === 'sub-phase') {
-    // Drop as first task in this sub-phase
-    return hoveredRow + 1;
-  }
-
-  if (hoveredItem.type === 'phase') {
-    // Drop into first sub-phase of this phase, or skip
-    if (hoveredRow + 1 < rowMap.length && rowMap[hoveredRow + 1].type === 'sub-phase') {
-      return hoveredRow + 2; // after the first sub-phase header
-    }
-  }
-
-  return null;
+  const gap = taskDropGap(hoveredRow, relativeY, rowMap);
+  return gap === null || isOwnSlot(gap, rowMap, source) ? null : gap;
 }
 
 // ---- Dispatch helpers ----
@@ -478,6 +479,12 @@ function dispatchSubPhaseReorder(
  * MOVE_TASK_WITH_REORDER. Shared by left-panel list drag and right-side bar
  * drag so both paths behave identically.
  *
+ * `dropRow` is a gap: the drop line drawn between rowMap[dropRow - 1] and rowMap[dropRow].
+ * With a task below the gap, the dragged task goes in front of it, in that task's sub-phase.
+ * Otherwise the gap closes a group (or the list), and the task is appended to the sub-phase of
+ * the row above. That case used to take the row *below*, so dropping under the last task of
+ * "UX" sent the task to the end of the next sub-phase, "UI".
+ *
  * Leaves `insertBeforeTaskId` undefined to signal "append to target phase"
  * (the reducer handles that by inserting after the last task in targetPhase).
  */
@@ -488,37 +495,20 @@ export function resolveTaskDropTarget(
 ): { targetPhase: string; insertBeforeTaskId?: string } | null {
   if (!source.taskId) return null;
 
-  let targetMaster: string | null = null;
-  let targetSub: string | null = null;
-  let insertBeforeTaskId: string | undefined;
-
-  if (dropRow < rowMap.length) {
-    const item = rowMap[dropRow];
-    targetMaster = item.masterPhase;
-    targetSub = item.subPhase ?? null;
-    if (item.type === 'task' && item.taskId !== source.taskId) {
-      insertBeforeTaskId = item.taskId;
-    }
-    if (!targetSub) {
-      // Landing on a phase header — walk forward to find the first sub-phase
-      for (let i = dropRow; i < rowMap.length; i++) {
-        if (rowMap[i].subPhase && rowMap[i].masterPhase === targetMaster) {
-          targetSub = rowMap[i].subPhase!;
-          break;
-        }
-      }
-    }
-  } else {
-    // dropRow === rowMap.length → append semantics; don't set insertBeforeTaskId.
-    const lastItem = rowMap[rowMap.length - 1];
-    if (lastItem) {
-      targetMaster = lastItem.masterPhase;
-      targetSub = lastItem.subPhase ?? null;
-    }
+  const below = rowMap[dropRow];
+  if (below?.type === 'task' && below.subPhase) {
+    if (below.taskId === source.taskId) return null; // dropped back into its own slot
+    return { targetPhase: joinPhase(below.masterPhase, below.subPhase), insertBeforeTaskId: below.taskId };
   }
 
-  if (!targetMaster || !targetSub) return null;
-  return { targetPhase: `${targetMaster} ${targetSub}`, insertBeforeTaskId };
+  const above = rowMap[dropRow - 1];
+  if (!above) return null;
+  // Under a phase header (its first sub-phase is collapsed): that phase's first sub-phase.
+  const targetSub =
+    above.subPhase ??
+    rowMap.slice(dropRow).find(r => r.masterPhase === above.masterPhase && r.subPhase)?.subPhase;
+  if (!targetSub) return null;
+  return { targetPhase: joinPhase(above.masterPhase, targetSub) };
 }
 
 function dispatchTaskReorder(

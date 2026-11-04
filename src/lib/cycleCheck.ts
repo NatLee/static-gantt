@@ -1,13 +1,13 @@
 import { Task } from '@/types';
+import { parseAfter } from './dependencies';
 
 export function wouldCreateCycle(tasks: Task[], predecessorId: string, successorId: string): boolean {
   if (predecessorId === successorId) return true;
 
   const afterMap = new Map<string, string[]>();
   tasks.forEach(t => {
-    if (!t.after) return;
-    const preds = t.after.split(',').map(s => s.trim()).filter(Boolean);
-    afterMap.set(t.id, preds);
+    const preds = parseAfter(t.after);
+    if (preds.length > 0) afterMap.set(t.id, preds);
   });
 
   const simulated = new Map(afterMap);

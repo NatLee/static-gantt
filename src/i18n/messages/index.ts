@@ -14,3 +14,10 @@ export const catalogs: Record<Locale, Record<MessageKey, string>> = {
   'zh-CN': zhCN,
   ja,
 };
+
+/** Translation key for each task status, shared by the tooltip, the search list and the bars. */
+export const STATUS_LABEL_KEYS = {
+  done: 'status.done',
+  'in-progress': 'status.inProgress',
+  planned: 'status.planned',
+} as const satisfies Record<import('@/types').TaskStatus, MessageKey>;

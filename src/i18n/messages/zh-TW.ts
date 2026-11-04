@@ -8,6 +8,10 @@ const zhTW: Record<MessageKey, string> = {
   'common.rename': '重新命名',
   'common.duplicate': '複製',
   'common.download': '下載',
+  'a11y.taskBar': '{name}，{start} 到 {end}，{status}',
+  'a11y.toggleGroup': '展開或收合「{name}」',
+  'a11y.renameGroup': '重新命名「{name}」',
+  'a11y.chart': '甘特圖',
 
   // top-level menus
   'menu.file': '檔案',
@@ -27,6 +31,10 @@ const zhTW: Record<MessageKey, string> = {
   'file.downloadBackup': '下載備份（全部）',
   'file.importJson': '匯入 JSON…',
   'file.importFailed': '匯入失敗',
+  'import.notJson': '這個檔案不是有效的 JSON。',
+  'import.unknownFormat': '這個 JSON 不是本工具的專案檔或備份檔。',
+  'import.noProjects': '備份檔裡沒有任何專案，所以沒有匯入。',
+  'import.invalidProject': '專案「{name}」的任務資料缺漏或損壞，所以沒有匯入。',
 
   // Edit menu
   'edit.undo': '復原',
@@ -66,7 +74,7 @@ const zhTW: Record<MessageKey, string> = {
 
   // Export menu
   'export.gantt': '甘特圖',
-  'export.csv': 'CSV（Excel）',
+  'export.csv': 'Excel（.xlsx）',
   'export.png': 'PNG',
   'export.jsonProject': 'JSON（目前專案）',
   'export.mermaid': 'Mermaid',
@@ -88,7 +96,7 @@ const zhTW: Record<MessageKey, string> = {
   'about.featureVisual': '拖放排程，支援相依關係與關鍵路徑',
   'about.featureMermaid': 'Mermaid 甘特圖雙向編輯',
   'about.featureAutosave': '自動儲存，瀏覽器內多專案管理',
-  'about.featureExport': '匯出 PNG、CSV 與 Mermaid',
+  'about.featureExport': '匯出 PNG、Excel 與 Mermaid',
   'about.builtWith': '以 Next.js、React 與 TypeScript 打造',
 
   // Mode segmented + header buttons
@@ -156,6 +164,7 @@ const zhTW: Record<MessageKey, string> = {
   'switcher.manage': '管理專案…',
   'switcher.saving': '儲存中…',
   'switcher.saved': '已儲存',
+  'switcher.saveFailed': '沒有儲存：瀏覽器拒絕儲存這個專案（空間可能已滿）。請先下載備份，以免資料遺失。',
 
   // Add/Edit dialog
   'dialog.addPhase.title': '新增階段',
@@ -317,6 +326,11 @@ const zhTW: Record<MessageKey, string> = {
   'shortcuts.insertTask': '插入任務',
   'shortcuts.insertMilestone': '插入里程碑',
   'shortcuts.format': '格式化',
+  'shortcuts.taskBar': '選取的任務條',
+  'shortcuts.barOpen': '打開任務編輯',
+  'shortcuts.barMove': '提早／延後一天',
+  'shortcuts.barResize': '工期減少／增加一天',
+  'shortcuts.barMenu': '打開任務選單',
 
   // Welcome dialog
   'welcome.title': '歡迎 👋',

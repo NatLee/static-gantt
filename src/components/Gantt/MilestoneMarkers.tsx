@@ -3,12 +3,11 @@
 import React from 'react';
 import { Diamond } from 'lucide-react';
 import { Milestone, GanttAction } from '@/types';
-import { formatDateFull, dateToOffset } from '@/lib/dateUtils';
-import { PROJECT_START_DATE } from '@/data/defaultProject';
+import { formatDateFull, dateToOffset, offsetToDate, todayOffset } from '@/lib/dateUtils';
 import { PIXELS_PER_DAY, Z } from '@/lib/ganttLayout';
+import { isActivationKey } from '@/lib/a11y';
 import { useI18n } from '@/i18n/I18nProvider';
 
-const MS_PER_DAY = 86400000;
 
 interface MilestoneMarkersProps {
   milestones: Milestone[];
@@ -31,9 +30,9 @@ export default function MilestoneMarkers({
   // Derive "today" on every render (matching GridBackground's calculation) so
   // the dashed TODAY line never drifts a day apart from the grid's today column
   // across a long-lived session that spans local midnight.
-  const todayOffset = dateToOffset(new Date());
+  const today = todayOffset();
 
-  const todayX = (todayOffset - timelineStartDay) * ppd;
+  const todayX = (today - timelineStartDay) * ppd;
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: totalHeight, pointerEvents: 'none', zIndex: Z.barsHover }}>
@@ -71,9 +70,7 @@ export default function MilestoneMarkers({
 
       {/* Milestone markers */}
       {milestones.map((ms) => {
-        const msOffset = Math.round(
-          (new Date(ms.date).getTime() - PROJECT_START_DATE.getTime()) / MS_PER_DAY
-        );
+        const msOffset = dateToOffset(ms.date);
         const x = (msOffset - timelineStartDay) * ppd;
 
         return (
@@ -94,12 +91,21 @@ export default function MilestoneMarkers({
             {/* Floating label */}
             <div
               className={`milestone-label clickable ${ms.colorClass}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`${ms.name}, ${formatDateFull(offsetToDate(msOffset))}`}
               onClick={() =>
                 dispatch({
                   type: 'OPEN_DIALOG',
                   dialog: { type: 'edit-milestone', context: { milestoneId: ms.id } },
                 })
               }
+              onKeyDown={(e) => {
+                if (isActivationKey(e)) {
+                  e.preventDefault();
+                  e.currentTarget.click();
+                }
+              }}
               style={{
                 position: 'absolute',
                 top: 4,
@@ -125,7 +131,7 @@ export default function MilestoneMarkers({
                 {ms.name}
               </span>
               <span className="milestone-date" style={{ fontSize: 9, opacity: 0.8 }}>
-                {formatDateFull(new Date(ms.date))}
+                {formatDateFull(offsetToDate(msOffset))}
               </span>
             </div>
           </div>

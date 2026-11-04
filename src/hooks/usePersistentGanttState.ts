@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppStorage, GanttAction, ProjectFile, SerializableGanttState } from '@/types';
+import { AppStorage, GanttAction, ProjectFile } from '@/types';
 import { useGanttState } from './useGanttState';
 import {
   buildDefaultProject,
@@ -15,22 +15,29 @@ import {
   parseImport,
   saveAppStorage,
   serializeState,
+  withLiveState,
 } from '@/lib/projectStorage';
 
 const SAVE_DEBOUNCE_MS = 400;
+/** How long the green "saved" dot stays after a successful write. */
+const SAVED_BADGE_MS = 1500;
 
-export type SaveStatus = 'idle' | 'saving' | 'saved';
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 export interface ProjectsAPI {
   projects: Array<{ id: string; name: string; updatedAt: string; taskCount: number }>;
   activeProjectId: string;
+  /** Name of the open project ('' until saved data has loaded). */
+  activeProjectName: string;
   createEmpty: (name?: string) => void;
   createFromDefault: (name?: string) => void;
-  duplicateActive: () => void;
+  /** Copy a project (the open one includes its unsaved edits) and open the copy. */
+  duplicate: (id: string) => void;
   switchTo: (id: string) => void;
   rename: (id: string, name: string) => void;
   remove: (id: string) => void;
-  downloadActive: () => void;
+  /** Download one project as .gantt.json without switching to it. */
+  download: (id: string) => void;
   downloadAll: () => void;
   importJsonText: (text: string) => Promise<{ kind: 'project' | 'app'; message: string }>;
 }
@@ -49,11 +56,26 @@ export function usePersistentGanttState() {
   const savedStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextSerializeRef = useRef(false);
   const lastSerializedRef = useRef<string>('');
+  const pendingSaveRef = useRef<(() => void) | null>(null);
 
-  // Initial load from localStorage (client only)
+  /** Show the result of a write: a short "saved", or "not saved" until a later write succeeds. */
+  const reportSave = useCallback((ok: boolean) => {
+    if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
+    if (!ok) {
+      setSaveStatus('error');
+      return;
+    }
+    setSaveStatus('saved');
+    setLastSavedAt(Date.now());
+    savedStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), SAVED_BADGE_MS);
+  }, []);
+
+  // Initial load from localStorage. This has to run after mount: the page is prebuilt without
+  // access to the browser storage, and the first client render must match that HTML.
   useEffect(() => {
     const loaded = loadAppStorage();
     storageRef.current = loaded;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from localStorage once after mount
     setStorage(loaded);
 
     const active = findActiveProject(loaded);
@@ -95,7 +117,8 @@ export function usePersistentGanttState() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSaveStatus('saving');
 
-    saveTimerRef.current = setTimeout(() => {
+    const save = () => {
+      pendingSaveRef.current = null;
       const current = storageRef.current;
       if (!current) return;
       const activeIdx = current.projects.findIndex(p => p.id === current.activeProjectId);
@@ -115,26 +138,39 @@ export function usePersistentGanttState() {
         },
       };
       storageRef.current = nextStorage;
-      saveAppStorage(nextStorage);
       setStorage(nextStorage);
       lastSerializedRef.current = payload;
-      setSaveStatus('saved');
-      setLastSavedAt(Date.now());
-
-      if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
-      savedStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 1500);
-    }, SAVE_DEBOUNCE_MS);
+      reportSave(saveAppStorage(nextStorage));
+    };
+    pendingSaveRef.current = save;
+    saveTimerRef.current = setTimeout(save, SAVE_DEBOUNCE_MS);
 
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      pendingSaveRef.current = null;
     };
-  }, [state, hydrated]);
+  }, [state, hydrated, reportSave]);
+
+  // An edit made less than SAVE_DEBOUNCE_MS before the tab is closed or hidden would otherwise
+  // be lost: write it out right away.
+  useEffect(() => {
+    const flush = () => pendingSaveRef.current?.();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
 
   const commitStorage = useCallback((next: AppStorage) => {
     storageRef.current = next;
-    saveAppStorage(next);
     setStorage(next);
-  }, []);
+    reportSave(saveAppStorage(next));
+  }, [reportSave]);
 
   const loadProjectIntoState = useCallback(
     (project: ProjectFile) => {
@@ -154,6 +190,7 @@ export function usePersistentGanttState() {
         taskCount: p.state.tasks.length,
       })) || [],
     activeProjectId: storage?.activeProjectId || '',
+    activeProjectName: storage ? findActiveProject(storage).name : '',
 
     createEmpty: useCallback(
       (name = 'Untitled Project') => {
@@ -185,51 +222,35 @@ export function usePersistentGanttState() {
       [commitStorage, loadProjectIntoState]
     ),
 
-    duplicateActive: useCallback(() => {
-      if (!storageRef.current) return;
-      const active = findActiveProject(storageRef.current);
-      const copy: ProjectFile = {
-        ...active,
-        id: makeId(),
-        name: `${active.name} (copy)`,
-        createdAt: now(),
-        updatedAt: now(),
-        state: serializeState(state) as SerializableGanttState,
-      };
-      const next: AppStorage = {
-        ...storageRef.current,
-        projects: [...storageRef.current.projects, copy],
-        activeProjectId: copy.id,
-      };
-      commitStorage(next);
-      loadProjectIntoState(copy);
-    }, [state, commitStorage, loadProjectIntoState]),
+    duplicate: useCallback(
+      (id: string) => {
+        if (!storageRef.current) return;
+        // Write the open project's latest edits first, then copy the requested project from
+        // that: the copy used to take the open project's tasks whatever project was picked.
+        const saved = withLiveState(storageRef.current, state);
+        const source = saved.projects.find(p => p.id === id);
+        if (!source) return;
+        const copy: ProjectFile = {
+          ...source,
+          id: makeId(),
+          name: `${source.name} (copy)`,
+          createdAt: now(),
+          updatedAt: now(),
+        };
+        commitStorage({ ...saved, projects: [...saved.projects, copy], activeProjectId: copy.id });
+        loadProjectIntoState(copy);
+      },
+      [state, commitStorage, loadProjectIntoState]
+    ),
 
     switchTo: useCallback(
       (id: string) => {
         if (!storageRef.current) return;
         if (id === storageRef.current.activeProjectId) return;
-        // Save current state to current active project first
-        const currentActiveIdx = storageRef.current.projects.findIndex(
-          p => p.id === storageRef.current!.activeProjectId
-        );
         const targetProject = storageRef.current.projects.find(p => p.id === id);
         if (!targetProject) return;
-
-        const projects = [...storageRef.current.projects];
-        if (currentActiveIdx >= 0) {
-          projects[currentActiveIdx] = {
-            ...projects[currentActiveIdx],
-            updatedAt: now(),
-            state: serializeState(state),
-          };
-        }
-        const next: AppStorage = {
-          ...storageRef.current,
-          projects,
-          activeProjectId: id,
-        };
-        commitStorage(next);
+        // Save the open project's edits before leaving it.
+        commitStorage({ ...withLiveState(storageRef.current, state), activeProjectId: id });
         loadProjectIntoState(targetProject);
       },
       [state, commitStorage, loadProjectIntoState]
@@ -284,22 +305,20 @@ export function usePersistentGanttState() {
       [commitStorage, loadProjectIntoState]
     ),
 
-    downloadActive: useCallback(() => {
-      if (!storageRef.current) return;
-      const active = findActiveProject(storageRef.current);
-      // Make sure we download the latest state, not whatever was saved
-      const current: ProjectFile = {
-        ...active,
-        updatedAt: now(),
-        state: serializeState(state),
-      };
-      downloadProjectFile(current);
-    }, [state]),
+    download: useCallback(
+      (id: string) => {
+        if (!storageRef.current) return;
+        // The open project is downloaded with its unsaved edits, any other one as saved.
+        const project = withLiveState(storageRef.current, state).projects.find(p => p.id === id);
+        if (project) downloadProjectFile(project);
+      },
+      [state]
+    ),
 
     downloadAll: useCallback(() => {
       if (!storageRef.current) return;
-      downloadAppStorage(storageRef.current);
-    }, []),
+      downloadAppStorage(withLiveState(storageRef.current, state));
+    }, [state]),
 
     importJsonText: useCallback(
       async (text: string) => {

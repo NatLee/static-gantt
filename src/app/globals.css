@@ -355,12 +355,6 @@ select.custom-select {
   color: var(--text-primary);
   margin: 0;
 }
-.menubar-brand-subtitle {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin: 0;
-}
 
 /* --- Project switcher chip --- */
 .project-switcher {
@@ -785,3 +779,18 @@ select.custom-select {
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* --- Keyboard focus ------------------------------------------------------
+   Every control shows where keyboard focus is; mouse clicks don't draw the ring. */
+:where(button, a, [role="button"], [role^="menuitem"], [tabindex]:not([tabindex="-1"]), input[type="checkbox"], input[type="range"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.task-bar:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
+.task-row:focus-visible { outline-offset: -2px; }
+button.collapse-btn { background: transparent; border: 0; padding: 0; color: inherit; font: inherit; }
+
+/* Milestone colours are stored with each milestone as pale text classes made for the dark theme
+   (text-*-300). On the light background that text was unreadable, so it takes the theme's text
+   colour; the tinted fill, border and line keep the milestone's colour. */
+[data-theme="light"] .milestone-label { color: var(--text-primary); }

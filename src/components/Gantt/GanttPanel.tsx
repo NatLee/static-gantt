@@ -2,7 +2,7 @@
 
 import React, { useRef, useCallback, useMemo, useEffect, useLayoutEffect, useState } from 'react';
 import { GanttState, GanttAction, ComputedTask, HierarchyMap } from '@/types';
-import { offsetToDate, formatDateFull, dateToOffset } from '@/lib/dateUtils';
+import { offsetToDate, formatDateFull, todayOffset } from '@/lib/dateUtils';
 import TimelineHeader from './TimelineHeader';
 import TaskListColumn from './TaskListColumn';
 import GridBackground from './GridBackground';
@@ -16,6 +16,7 @@ import { ROW_HEIGHT, PIXELS_PER_DAY, Z } from '@/lib/ganttLayout';
 import { useResizableSidebar } from '@/hooks/useResizableSidebar';
 import { useVirtualRows } from '@/hooks/useVirtualRows';
 import { useDragToConnect } from '@/hooks/useDragToConnect';
+import { buildRowMap } from '@/hooks/useDragReorder';
 import { buildDepPath, buildArrowHead } from '@/lib/depPath';
 import { useI18n } from '@/i18n/I18nProvider';
 
@@ -24,68 +25,6 @@ interface GanttPanelProps {
   dispatch: React.Dispatch<GanttAction>;
   computed: ComputedTask[];
   hierarchy: HierarchyMap;
-  taskMap: Map<string, ComputedTask>;
-}
-
-function computeRowIndexMap(
-  hierarchy: HierarchyMap,
-  currentFilter: string,
-  collapsedPhases: Set<string>,
-  collapsedSubPhases: Set<string>
-): Map<string, number> {
-  const map = new Map<string, number>();
-  let rowIndex = 0;
-  const masters = Object.keys(hierarchy);
-
-  masters.forEach((master) => {
-    if (currentFilter !== 'ALL' && currentFilter !== master) return;
-    rowIndex++; // Phase header
-    if (collapsedPhases.has(master)) return;
-    const subs = hierarchy[master];
-    Object.keys(subs).forEach((sub) => {
-      rowIndex++; // Sub-phase header
-      const collapseKey = `${master}::${sub}`;
-      if (collapsedSubPhases.has(collapseKey)) return;
-      subs[sub].forEach((task) => {
-        map.set(task.id, rowIndex);
-        rowIndex++;
-      });
-    });
-  });
-
-  return map;
-}
-
-function countTotalRows(
-  hierarchy: HierarchyMap,
-  currentFilter: string,
-  collapsedPhases: Set<string>,
-  collapsedSubPhases: Set<string>
-): number {
-  let count = 0;
-  const masters = Object.keys(hierarchy);
-
-  masters.forEach((master) => {
-    if (currentFilter !== 'ALL' && currentFilter !== master) return;
-
-    count++; // Phase header row
-
-    if (collapsedPhases.has(master)) return;
-
-    const subs = hierarchy[master];
-    const subKeys = Object.keys(subs);
-
-    subKeys.forEach((sub) => {
-      count++; // Sub-phase header row
-
-      const collapseKey = `${master}::${sub}`;
-      if (collapsedSubPhases.has(collapseKey)) return;
-
-      count += subs[sub].length; // Task rows
-    });
-  });
-
-  return count;
 }
 
 export default function GanttPanel({
@@ -93,7 +32,6 @@ export default function GanttPanel({
   dispatch,
   computed,
   hierarchy,
-  taskMap,
 }: GanttPanelProps) {
   const { t } = useI18n();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -113,19 +51,32 @@ export default function GanttPanel({
   const totalDays = state.timelineEndDay - state.timelineStartDay;
   const totalWidth = totalDays * ppd;
 
-  const totalRows = useMemo(
-    () => countTotalRows(hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases),
+  // One row list (phase, sub-phase and task rows after filter and collapse) drives the row
+  // count, each task's row and the drag-and-drop targets, so they can't disagree.
+  const rowMap = useMemo(
+    () => buildRowMap(hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases),
     [hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases]
   );
+  const totalRows = rowMap.length;
 
-  const rowIndexMap = useMemo(
-    () => computeRowIndexMap(hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases),
-    [hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases]
-  );
+  const rowIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    rowMap.forEach((row, i) => {
+      if (row.taskId) map.set(row.taskId, i);
+    });
+    return map;
+  }, [rowMap]);
 
   const computedWithRows = useMemo(
     () => computed.map(t => ({ ...t, rowIndex: rowIndexMap.get(t.id) })),
     [computed, rowIndexMap]
+  );
+  // Tasks by id *with* their row. Connecting needs the source row to start the line; it was
+  // given the plain task map, where rowIndex is always undefined, so dragging from a bar's
+  // connector dot never started and no dependency could be drawn.
+  const rowTaskMap = useMemo(
+    () => new Map(computedWithRows.map(t => [t.id, t])),
+    [computedWithRows]
   );
 
   const totalHeight = totalRows * ROW_HEIGHT;
@@ -137,12 +88,12 @@ export default function GanttPanel({
     if (didScrollToTodayRef.current) return;
     const el = scrollContainerRef.current;
     if (!el || totalWidth <= 0) return;
-    const todayOffset = dateToOffset(new Date());
-    if (todayOffset < state.timelineStartDay || todayOffset > state.timelineEndDay) {
+    const today = todayOffset();
+    if (today < state.timelineStartDay || today > state.timelineEndDay) {
       didScrollToTodayRef.current = true;
       return;
     }
-    const todayLeftPx = (todayOffset - state.timelineStartDay) * ppd;
+    const todayLeftPx = (today - state.timelineStartDay) * ppd;
     // Put today at ~25% from the left edge so some past context stays visible.
     el.scrollLeft = Math.max(0, todayLeftPx - el.clientWidth * 0.25);
     didScrollToTodayRef.current = true;
@@ -150,7 +101,7 @@ export default function GanttPanel({
 
   const connect = useDragToConnect({
     tasks: state.tasks,
-    taskMap,
+    taskMap: rowTaskMap,
     dispatch,
     zoomScale: state.zoomScale,
     timelineStartDay: state.timelineStartDay,

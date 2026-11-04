@@ -35,14 +35,22 @@ import {
 import { Menu, MenuItem, MenuDivider, MenuHeading } from './Menu';
 import ProjectSwitcher from './ProjectSwitcher';
 import { Segmented, SegmentedButton } from './Segmented';
-import { PROJECT_TITLE, PROJECT_SUBTITLE } from '@/data/defaultProject';
 import { exportToExcel } from '@/lib/exportExcel';
+import { ImportError, type ImportErrorCode } from '@/lib/projectStorage';
+import type { MessageKey } from '@/i18n/messages';
 import type { GanttAction, GanttState, ComputedTask } from '@/types';
 import type { ProjectsAPI, SaveStatus } from '@/hooks/usePersistentGanttState';
-import type { ZoomPreset } from '@/components/GanttApp';
+import { zoomPresetFor, type ZoomPreset } from '@/lib/ganttLayout';
 import { useI18n } from '@/i18n/I18nProvider';
 import { LOCALES, LOCALE_LABELS } from '@/i18n/config';
 import { Languages } from 'lucide-react';
+
+const IMPORT_ERROR_MESSAGES: Record<ImportErrorCode, MessageKey> = {
+  'not-json': 'import.notJson',
+  'unknown-format': 'import.unknownFormat',
+  'no-projects': 'import.noProjects',
+  'invalid-project': 'import.invalidProject',
+};
 
 export interface MenubarProps {
   state: GanttState;
@@ -116,7 +124,7 @@ export default function Menubar(props: MenubarProps) {
         const text = await file.text();
         await projectsApi.importJsonText(text);
       } catch (err) {
-        alert(err instanceof Error ? err.message : t('file.importFailed'));
+        alert(err instanceof ImportError ? t(IMPORT_ERROR_MESSAGES[err.code], { name: err.projectName ?? '' }) : t('file.importFailed'));
       } finally {
         if (jsonInputRef.current) jsonInputRef.current.value = '';
       }
@@ -139,8 +147,7 @@ export default function Menubar(props: MenubarProps) {
   );
 
   const isMermaid = state.currentMode === 'mermaid';
-  const currentZoomPreset: ZoomPreset | null =
-    state.zoomScale >= 3 ? 'day' : state.zoomScale >= 1.6 ? 'week' : 'month';
+  const currentZoomPreset = zoomPresetFor(state.zoomScale);
 
   const handleSetMode = useCallback(
     (mode: 'visual' | 'mermaid') => dispatch({ type: 'SET_MODE', mode }),
@@ -154,8 +161,7 @@ export default function Menubar(props: MenubarProps) {
           <Layers className="w-4 h-4 text-white" />
         </div>
         <div className="menubar-brand">
-          <h1 className="menubar-brand-title">{PROJECT_TITLE}</h1>
-          <p className="menubar-brand-subtitle">{PROJECT_SUBTITLE}</p>
+          <h1 className="menubar-brand-title">{t('about.appName')}</h1>
         </div>
         <ProjectSwitcher
           api={projectsApi}
@@ -186,7 +192,7 @@ export default function Menubar(props: MenubarProps) {
           <MenuItem
             icon={<Copy className="w-3.5 h-3.5" />}
             label={t('file.duplicate')}
-            onClick={() => projectsApi.duplicateActive()}
+            onClick={() => projectsApi.duplicate(projectsApi.activeProjectId)}
           />
           <MenuItem
             icon={<FileText className="w-3.5 h-3.5" />}
@@ -197,7 +203,7 @@ export default function Menubar(props: MenubarProps) {
           <MenuItem
             icon={<Download className="w-3.5 h-3.5" />}
             label={t('file.downloadJson')}
-            onClick={() => projectsApi.downloadActive()}
+            onClick={() => projectsApi.download(projectsApi.activeProjectId)}
           />
           <MenuItem
             icon={<HardDriveDownload className="w-3.5 h-3.5" />}
@@ -387,7 +393,7 @@ export default function Menubar(props: MenubarProps) {
           <MenuItem
             icon={<Download className="w-3.5 h-3.5" />}
             label={t('export.csv')}
-            onClick={() => exportToExcel(computed, state.currentFilter)}
+            onClick={() => exportToExcel(computed, state.currentFilter, projectsApi.activeProjectName || t('about.appName'))}
           />
           <MenuItem
             icon={<ImageIcon className="w-3.5 h-3.5" />}
@@ -398,7 +404,7 @@ export default function Menubar(props: MenubarProps) {
           <MenuItem
             icon={<Download className="w-3.5 h-3.5" />}
             label={t('export.jsonProject')}
-            onClick={() => projectsApi.downloadActive()}
+            onClick={() => projectsApi.download(projectsApi.activeProjectId)}
           />
           <MenuDivider />
           <MenuHeading>{t('export.mermaid')}</MenuHeading>

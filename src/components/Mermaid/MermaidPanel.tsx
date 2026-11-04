@@ -10,8 +10,10 @@ import {
   useState,
 } from 'react';
 import { GanttState } from '@/types';
-import { generateMermaidFromData } from '@/lib/mermaidGenerator';
+import { generateMermaid } from '@/lib/mermaidGenerator';
 import { formatMermaid } from '@/lib/mermaidFormat';
+import { todayISO } from '@/lib/dateUtils';
+import { downloadBlob, exportBaseName } from '@/lib/download';
 import CodeMirror from '@uiw/react-codemirror';
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { mermaidLanguage } from '@/lib/codemirror/mermaidLang';
@@ -31,12 +33,18 @@ export interface MermaidPanelHandle {
 
 interface MermaidPanelProps {
   state: GanttState;
+  /** Written as the chart title (the active project's name). */
+  title: string;
 }
 
 const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
-  function MermaidPanel({ state }, ref) {
+  function MermaidPanel({ state, title }, ref) {
     const { t } = useI18n();
-    const [code, setCode] = useState(() => generateMermaidFromData(state.tasks));
+    // The panel mounts when Mermaid mode opens, so the text is generated from the chart once per
+    // visit; edits made here are read back by GanttApp when the user switches to visual mode.
+    const [code, setCode] = useState(() =>
+      generateMermaid({ title, tasks: state.tasks, milestones: state.milestones })
+    );
     const [svgContent, setSvgContent] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [editorWidth, setEditorWidth] = useState(40); // percentage
@@ -53,7 +61,6 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
     const svgContainerRef = useRef<HTMLDivElement>(null);
     const renderIdRef = useRef(0);
     const editorRef = useRef<ReactCodeMirrorRef>(null);
-    const prevModeRef = useRef(state.currentMode);
 
     // Imperative API exposed to parent (GanttApp) so the global Header toolbar
     // can drive editor actions without duplicating state. `apiRef` is mutated
@@ -75,17 +82,6 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
       }),
       []
     );
-
-    // Regenerate code only when mode switches FROM visual TO mermaid.
-    // Staying in mermaid mode must not overwrite user edits even if tasks change.
-    useEffect(() => {
-      if (prevModeRef.current !== 'mermaid' && state.currentMode === 'mermaid') {
-        const newCode = generateMermaidFromData(state.tasks);
-        setCode(newCode);
-        codeRef.current = newCode;
-      }
-      prevModeRef.current = state.currentMode;
-    }, [state.currentMode, state.tasks]);
 
     // Render mermaid diagram
     const renderMermaid = useCallback(async (mermaidCode: string) => {
@@ -229,14 +225,8 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
     // --- Export ---
     const handleExportSVG = useCallback(() => {
       if (!svgContent) return;
-      const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'gantt-chart.svg';
-      a.click();
-      URL.revokeObjectURL(url);
-    }, [svgContent]);
+      downloadBlob(new Blob([svgContent], { type: 'image/svg+xml' }), `${exportBaseName(title)}.svg`);
+    }, [svgContent, title]);
 
     const handleExportPNG = useCallback(() => {
       if (!svgContent) return;
@@ -254,18 +244,12 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
         ctx.scale(scale, scale);
         ctx.drawImage(img, 0, 0);
         canvas.toBlob((blob) => {
-          if (!blob) return;
-          const pngUrl = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = pngUrl;
-          a.download = 'gantt-chart.png';
-          a.click();
-          URL.revokeObjectURL(pngUrl);
+          if (blob) downloadBlob(blob, `${exportBaseName(title)}.png`);
         }, 'image/png');
         URL.revokeObjectURL(url);
       };
       img.src = url;
-    }, [svgContent]);
+    }, [svgContent, title]);
 
     const extensions = useMemo(() => [mermaidLanguage], []);
 
@@ -315,7 +299,7 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
 
     const handleInsertTask = useCallback(() => {
       const id = `t${Date.now().toString(36).slice(-4)}`;
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const name = 'New Task';
       const snippet = `    ${name.padEnd(40, ' ')}:${id}, ${today}, 5d`;
       insertAtCursor(snippet);
@@ -334,7 +318,7 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
 
     const handleInsertMilestone = useCallback(() => {
       const id = `m${Date.now().toString(36).slice(-4)}`;
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const name = 'New Milestone';
       const snippet = `    ${name.padEnd(40, ' ')}:milestone, ${id}, ${today}, 0d`;
       insertAtCursor(snippet);
@@ -361,13 +345,8 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
 
     const handleDownloadMmd = useCallback(() => {
       const blob = new Blob([codeRef.current], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'gantt-chart.mmd';
-      a.click();
-      URL.revokeObjectURL(url);
-    }, []);
+      downloadBlob(blob, `${exportBaseName(title)}.mmd`);
+    }, [title]);
 
     const handleImportMmd = useCallback(
       (text: string) => {

@@ -1,6 +1,7 @@
 'use client';
 
-import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useMenuNavigation } from '@/hooks/useMenuNavigation';
 
 interface MenuProps {
   label: string;
@@ -10,36 +11,48 @@ interface MenuProps {
 export function Menu({ label, children }: MenuProps) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  const close = useCallback(() => setOpen(false), []);
+  const onMenuKeyDown = useMenuNavigation(menuRef, open, close);
 
   useEffect(() => {
     if (!open) return;
     const onMouseDown = (e: MouseEvent) => {
       if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
     window.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.removeEventListener('mousedown', onMouseDown);
   }, [open]);
-
-  const close = useCallback(() => setOpen(false), []);
 
   return (
     <div ref={wrapperRef} className="menu-root">
       <button
         type="button"
         className={`menu-label ${open ? 'menu-label-active' : ''}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
         onClick={() => setOpen(o => !o)}
+        onKeyDown={e => {
+          if (e.key === 'ArrowDown' && !open) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
       >
         {label}
       </button>
       {open && (
-        <div className="menu-dropdown" role="menu" onClick={close}>
+        <div
+          ref={menuRef}
+          id={menuId}
+          className="menu-dropdown"
+          role="menu"
+          aria-label={label}
+          onClick={close}
+          onKeyDown={onMenuKeyDown}
+        >
           {children}
         </div>
       )}
@@ -61,7 +74,10 @@ export function MenuItem({ icon, label, shortcut, onClick, disabled, checked, da
   return (
     <button
       type="button"
-      role="menuitem"
+      // Toggles (theme, language, zoom preset, working days) announce their state.
+      role={checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+      aria-checked={checked}
+      tabIndex={-1}
       className={`menu-item ${disabled ? 'menu-item-disabled' : ''} ${danger ? 'menu-item-danger' : ''}`}
       onClick={(e) => {
         if (disabled) {

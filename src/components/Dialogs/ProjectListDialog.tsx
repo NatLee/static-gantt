@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
+import Dialog from './Dialog';
 import { Check, Copy, Download, Pencil, Trash2, X } from 'lucide-react';
 import type { ProjectsAPI } from '@/hooks/usePersistentGanttState';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -11,18 +12,11 @@ interface Props {
 }
 
 export default function ProjectListDialog({ api, onClose }: Props) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const titleId = useId();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   const commitRename = useCallback(() => {
     if (renamingId) {
@@ -35,7 +29,7 @@ export default function ProjectListDialog({ api, onClose }: Props) {
   const formatDate = (iso: string) => {
     try {
       const d = new Date(iso);
-      return d.toLocaleString(undefined, {
+      return d.toLocaleString(locale, {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -51,14 +45,13 @@ export default function ProjectListDialog({ api, onClose }: Props) {
   );
 
   return (
-    <>
-      <div className="add-dialog-overlay" onClick={onClose} />
-      <div
-        className="add-dialog"
-        style={{ width: 520, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
-      >
+    <Dialog
+      labelledBy={titleId}
+      onClose={onClose}
+      style={{ width: 520, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+    >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+          <h3 id={titleId} className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
             {t('projects.title', { count: api.projects.length })}
           </h3>
           <button
@@ -66,6 +59,7 @@ export default function ProjectListDialog({ api, onClose }: Props) {
             onClick={onClose}
             type="button"
             title={t('common.close')}
+            aria-label={t('common.close')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -85,16 +79,11 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                   border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border-color)'}`,
                 }}
               >
-                <button
-                  className="flex-1 text-left min-w-0 cursor-pointer"
-                  onClick={() => {
-                    if (!isRenaming) api.switchTo(p.id);
-                  }}
-                  type="button"
-                  disabled={isRenaming}
-                >
-                  {isRenaming ? (
+                {isRenaming ? (
+                  <div className="flex-1 min-w-0">
+                    {/* An input may not sit inside a <button>; Firefox can't type into it. */}
                     <input
+                      aria-label={t('common.rename')}
                       autoFocus
                       className="w-full px-2 py-1 rounded border text-xs font-semibold"
                       style={{
@@ -107,14 +96,23 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                       onKeyDown={e => {
                         if (e.key === 'Enter') commitRename();
                         if (e.key === 'Escape') {
+                          // Cancel the rename only; don't let the dialog close too.
+                          e.preventDefault();
+                          e.stopPropagation();
                           setRenamingId(null);
                           setRenameValue('');
                         }
                       }}
                       onBlur={commitRename}
                     />
-                  ) : (
-                    <>
+                  </div>
+                ) : (
+                  <button
+                    className="flex-1 text-left min-w-0 cursor-pointer"
+                    onClick={() => api.switchTo(p.id)}
+                    aria-current={isActive ? 'true' : undefined}
+                    type="button"
+                  >
                       <div
                         className="text-xs font-bold truncate flex items-center gap-1.5"
                         style={{ color: 'var(--text-primary)' }}
@@ -128,9 +126,8 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                           : t('projects.taskOther', { count: p.taskCount })}{' '}
                         · {formatDate(p.updatedAt)}
                       </div>
-                    </>
-                  )}
-                </button>
+                  </button>
+                )}
 
                 {!isRenaming && (
                   <div className="flex items-center gap-1 shrink-0">
@@ -173,18 +170,12 @@ export default function ProjectListDialog({ api, onClose }: Props) {
                         <IconButton
                           icon={<Copy className="w-3 h-3" />}
                           title={t('common.duplicate')}
-                          onClick={() => {
-                            if (!isActive) api.switchTo(p.id);
-                            api.duplicateActive();
-                          }}
+                          onClick={() => api.duplicate(p.id)}
                         />
                         <IconButton
                           icon={<Download className="w-3 h-3" />}
                           title={t('common.download')}
-                          onClick={() => {
-                            if (!isActive) api.switchTo(p.id);
-                            api.downloadActive();
-                          }}
+                          onClick={() => api.download(p.id)}
                         />
                         <IconButton
                           icon={<Trash2 className="w-3 h-3" />}
@@ -210,8 +201,7 @@ export default function ProjectListDialog({ api, onClose }: Props) {
             {t('common.close')}
           </button>
         </div>
-      </div>
-    </>
+    </Dialog>
   );
 }
 
@@ -231,6 +221,7 @@ function IconButton({
       className="btn-glass rounded-md p-1 cursor-pointer"
       style={variant === 'danger' ? { color: '#ef4444' } : undefined}
       title={title}
+      aria-label={title}
       onClick={onClick}
       type="button"
     >

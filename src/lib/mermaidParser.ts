@@ -1,77 +1,97 @@
 import { Task, TaskStatus } from '@/types';
+import { formatAfter } from './dependencies';
+import {
+  AFTER_KEYWORD,
+  CRITICAL_FLAG,
+  MILESTONE_FLAG,
+  STATUS_FLAGS,
+  TASK_FLAGS,
+  isHeaderOrComment,
+  sectionName,
+} from './mermaidSyntax';
 
-export function parseMermaidToTasks(code: string): Task[] {
-  const lines = code.split('\n');
-  const newTasks: Task[] = [];
+/** A milestone as written in Mermaid. Colours are not part of the syntax; see applyMermaid. */
+export interface ParsedMilestone {
+  id: string;
+  name: string;
+  date: string;
+}
+
+export interface ParsedMermaid {
+  tasks: Task[];
+  milestones: ParsedMilestone[];
+}
+
+/** Days per Mermaid duration unit; other units (h, m, …) count as days, as before. */
+const DAYS_PER_UNIT: Record<string, number> = { d: 1, w: 7 };
+const DURATION_RE = /^(\d+)\s*([a-zA-Z]?)$/;
+
+/**
+ * Read a Mermaid gantt chart. Task lines look like
+ *   Name :[crit, ][done|active, ][milestone, ]id, (YYYY-MM-DD | after id1 [id2 …]), <n>d|<n>w
+ * Tasks outside a section are ignored (every task needs a phase). Milestones with a date become
+ * milestones wherever they are; a milestone placed with `after` stays a zero-day task, because a
+ * milestone marker needs a fixed date.
+ */
+export function parseMermaid(code: string): ParsedMermaid {
+  const tasks: Task[] = [];
+  const milestones: ParsedMilestone[] = [];
   let currentSection = '';
 
-  for (const line of lines) {
+  for (const line of code.split('\n')) {
     const trimmed = line.trim();
+    if (!trimmed || isHeaderOrComment(trimmed)) continue;
 
-    const secMatch = trimmed.match(/^section\s+(.+)/);
-    if (secMatch) {
-      currentSection = secMatch[1].trim();
+    const section = sectionName(trimmed);
+    if (section !== null) {
+      currentSection = section;
       continue;
     }
 
     const taskMatch = trimmed.match(/^(.+?)\s*:(.*?)\s*$/);
-    if (!taskMatch || !currentSection) continue;
-
+    if (!taskMatch) continue;
     const name = taskMatch[1].trim();
-    if (!name || name === 'gantt' || name.startsWith('title ') ||
-        name.startsWith('dateFormat') || name.startsWith('axisFormat') ||
-        name.startsWith('weekday')) continue;
-
     const parts = taskMatch[2].split(',').map(s => s.trim());
-    if (parts.length < 3) continue;
+    const flags = new Set(parts.filter(p => TASK_FLAGS.includes(p)));
+    const values = parts.filter(p => !TASK_FLAGS.includes(p));
+    // Need at least an id and a duration ("id, 5d"); "id, 2026-03-01" without a duration is skipped.
+    if (!name || values.length < 2) continue;
+    if (values.length === 2 && !DURATION_RE.test(values[1])) continue;
+    const isCritical = flags.has(CRITICAL_FLAG);
+    const isMilestone = flags.has(MILESTONE_FLAG);
+    const status: TaskStatus = STATUS_FLAGS.find(([flag]) => flags.has(flag))?.[1] ?? 'planned';
 
-    let isCritical = false;
-    let isDone = false;
-    let isActive = false;
-
-    const valueParts: string[] = [];
-    for (const p of parts) {
-      if (p === 'crit') { isCritical = true; continue; }
-      if (p === 'done') { isDone = true; continue; }
-      if (p === 'active') { isActive = true; continue; }
-      if (p === 'milestone') continue;
-      valueParts.push(p);
-    }
-
-    if (valueParts.length < 2) continue;
-
-    const id = valueParts[0];
+    const id = values[0];
     let start = '';
-    let after = '';
-    let duration = '';
-
-    if (valueParts.length >= 3) {
-      const secondPart = valueParts[1];
-      if (secondPart.startsWith('after ')) {
-        after = secondPart.replace('after ', '').trim();
-        duration = valueParts[2];
+    let after: string | undefined;
+    let duration: string;
+    if (values.length >= 3) {
+      duration = values[2];
+      const when = values[1];
+      if (when.startsWith(`${AFTER_KEYWORD} `)) {
+        // Mermaid allows several predecessors: "after a b c"
+        after = formatAfter(when.slice(AFTER_KEYWORD.length).trim().split(/\s+/));
       } else {
-        start = secondPart;
-        duration = valueParts[2];
+        start = when;
       }
     } else {
-      duration = valueParts[1];
+      duration = values[1];
     }
 
-    const durMatch = duration.match(/(\d+)\s*([wdWD]?)/);
-    let durDays = durMatch ? parseInt(durMatch[1]) : 1;
-    if (durMatch && durMatch[2].toLowerCase() === 'w') durDays *= 7;
+    if (isMilestone && start) {
+      milestones.push({ id, name, date: start });
+      continue;
+    }
+    if (!currentSection) continue;
 
-    let status: TaskStatus = 'planned';
-    if (isDone) status = 'done';
-    else if (isActive) status = 'in-progress';
+    const durMatch = duration.match(/(\d+)\s*([a-zA-Z]?)/);
+    const durDays = durMatch ? parseInt(durMatch[1], 10) * (DAYS_PER_UNIT[durMatch[2].toLowerCase()] ?? 1) : 1;
 
     const task: Task = { id, phase: currentSection, name, duration: durDays, isCritical, status };
     if (start) task.start = start;
     else if (after) task.after = after;
-
-    newTasks.push(task);
+    tasks.push(task);
   }
 
-  return newTasks;
+  return { tasks, milestones };
 }

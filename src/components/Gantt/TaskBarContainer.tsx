@@ -2,13 +2,17 @@
 
 import React, { useRef, useCallback, useState } from 'react';
 import { ComputedTask, GanttState, GanttAction, HierarchyMap } from '@/types';
-import { offsetToDate, formatDate, formatISO } from '@/lib/dateUtils';
+import { offsetToDate, offsetToISO, formatDate, formatDateFull } from '@/lib/dateUtils';
+import { isActivationKey, isContextMenuKey, menuPointFor } from '@/lib/a11y';
+import { STATUS_LABEL_KEYS } from '@/i18n/messages';
+import { endOffsetFor } from '@/lib/scheduler';
 import { PIXELS_PER_DAY, ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
-import { buildRowMap, findTaskDropRow, resolveTaskDropTarget, type RowItem } from '@/hooks/useDragReorder';
+import { buildRowMap, isOwnSlot, resolveTaskDropTarget, taskDropGap, taskListRowsEl, type RowItem } from '@/hooks/useDragReorder';
 import type { ConnectDirection } from '@/hooks/useDragToConnect';
 import { useRowHover } from '@/hooks/useRowHover';
 import { updateDepsForTask } from '@/lib/depLineLive';
+import { splitPhase } from '@/lib/phase';
 import { createAutoScroll, computeEdgeScrollSpeed } from '@/lib/autoScroll';
 import { AlertTriangle } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -150,9 +154,12 @@ export default function TaskBarContainer({
       const depSvg =
         (document.querySelector('svg[data-role="dep-svg"]') as SVGSVGElement | null) ?? null;
 
-      const phaseMatch = task.phase.match(/^(Phase \d+)\s+(.*)/);
-      const sourceMaster = phaseMatch?.[1] ?? '';
-      const sourceSub = phaseMatch?.[2];
+      const { master: sourceMaster, sub: sourceSub } = splitPhase(task.phase);
+
+      // A hover tooltip that was about to open would otherwise pop up mid-drag.
+      if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+      tooltipTimerRef.current = null;
+      setTooltip(null);
 
       didDragBarRef.current = false;
       dragState.current = {
@@ -217,30 +224,35 @@ export default function TaskBarContainer({
           const scrollEl = scrollContainerRef.current;
           let dropRow: number | null = null;
           let clampedHoveredRow: number | null = null;
+          let rejected = false;
           if (scrollEl) {
-            const listColEl = scrollEl.querySelector('.sticky-col');
-            const listAreaEl = listColEl?.children[1] as HTMLElement | undefined;
+            const listAreaEl = taskListRowsEl(scrollEl);
             if (listAreaEl) {
               const listRect = listAreaEl.getBoundingClientRect();
               const relativeY = ev.clientY - listRect.top;
               const hoveredRow = Math.floor(relativeY / ROW_HEIGHT);
               if (hoveredRow >= 0 && ds.rowMap.length > 0) {
                 // Clamp so dragging past the last row still yields a valid
-                // findTaskDropRow hit; the helper can then return rowMap.length
+                // taskDropGap hit; the helper can then return rowMap.length
                 // for "append at end" semantics.
                 clampedHoveredRow = Math.min(hoveredRow, ds.rowMap.length - 1);
-                dropRow = findTaskDropRow(clampedHoveredRow, relativeY, ds.rowMap, {
-                  type: 'task',
+                const source = {
+                  type: 'task' as const,
                   masterPhase: ds.sourceMaster,
                   subPhase: ds.sourceSub,
                   taskId: ds.taskId,
-                });
+                };
+                const gap = taskDropGap(clampedHoveredRow, relativeY, ds.rowMap);
+                // Over its own slot the task just changes dates: neither a drop line nor the
+                // red "can't drop here" band, which is for rows that really refuse a task.
+                dropRow = gap !== null && !isOwnSlot(gap, ds.rowMap, source) ? gap : null;
+                rejected = gap === null;
               }
             }
           }
           ds.dropRow = dropRow;
 
-          const isForbiddenHover = clampedHoveredRow !== null && dropRow === null;
+          const isForbiddenHover = clampedHoveredRow !== null && rejected;
 
           // Update drop indicator (valid drop → thin line between rows)
           if (ds.dropIndicatorEl) {
@@ -282,8 +294,10 @@ export default function TaskBarContainer({
           }
 
           if (pill) {
-            const newStart = offsetToDate(ds.origStartDayOffset + dayDelta);
-            const newEnd = offsetToDate(ds.origStartDayOffset + dayDelta + ds.origDuration - 1);
+            // Same end-date convention as the label next to the bar and the tooltip.
+            const startOffset = ds.origStartDayOffset + dayDelta;
+            const newStart = offsetToDate(startOffset);
+            const newEnd = offsetToDate(endOffsetFor(startOffset, ds.origDuration, state.workingDaysOnly));
             pill.textContent = `${formatDate(newStart)} → ${formatDate(newEnd)}`;
             pill.style.left = `${ev.clientX + 12}px`;
             pill.style.top = `${ev.clientY - 28}px`;
@@ -361,12 +375,12 @@ export default function TaskBarContainer({
             )
           : null;
 
-        const phaseChanged = !!resolved && resolved.targetPhase !== ds.origPhase;
-        const reorder =
-          !!resolved && (phaseChanged || resolved.insertBeforeTaskId !== undefined);
+        // Any resolved drop target is a move; "append to my own sub-phase" has no insert-before
+        // task but is still a move (it used to be ignored). The reducer skips no-op moves.
+        const reorder = resolved !== null;
 
         const newStartOffset = ds.origStartDayOffset + dayDelta;
-        const newDateISO = formatISO(offsetToDate(newStartOffset));
+        const newDateISO = offsetToISO(newStartOffset);
 
         if (reorder && resolved) {
           if (dayDelta !== 0) {
@@ -394,8 +408,33 @@ export default function TaskBarContainer({
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     },
-    [ppd, dispatch, hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases, computed, scrollContainerRef]
+    [ppd, dispatch, hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases, state.workingDaysOnly, scrollContainerRef]
   );
+
+  /**
+   * Keyboard equivalent of clicking and dragging a focused bar: Enter/Space opens the editor,
+   * ←/→ moves it a day (pinning its start, as dragging does), Shift+←/→ changes its length, and
+   * the menu key or Shift+F10 opens the task menu.
+   */
+  const handleBarKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, task: ComputedTask) => {
+    if (isActivationKey(e)) {
+      e.preventDefault();
+      dispatch({ type: 'SET_SELECTED_TASK', taskId: task.id });
+      dispatch({ type: 'OPEN_TASK_EDITOR', taskId: task.id });
+    } else if (isContextMenuKey(e)) {
+      e.preventDefault();
+      setContextMenu({ task, ...menuPointFor(e.currentTarget) });
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      const step = e.key === 'ArrowLeft' ? -1 : 1;
+      if (e.shiftKey) {
+        const newDuration = Math.max(1, task.duration + step);
+        if (newDuration !== task.duration) dispatch({ type: 'RESIZE_TASK', taskId: task.id, newDuration });
+      } else {
+        dispatch({ type: 'MOVE_TASK', taskId: task.id, newStartDate: offsetToISO(task.startDayOffset + step) });
+      }
+    }
+  };
 
   const visibleTasks = computed.filter((t) => {
     if (t.rowIndex === undefined || Number.isNaN(t.startDayOffset)) return false;
@@ -477,6 +516,7 @@ export default function TaskBarContainer({
               {/* Left cluster: outer = add-with-dep (before), inner = plain add */}
               <div
                 className="bar-add-btn left dep"
+                aria-hidden="true"
                 title={t('bar.addLinkedPred')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => handleConnectMouseDown(e, task, 'backward')}
@@ -488,6 +528,7 @@ export default function TaskBarContainer({
               </div>
               <div
                 className="bar-add-btn left plain"
+                aria-hidden="true"
                 title={t('bar.addAdjacent')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => {
@@ -511,6 +552,15 @@ export default function TaskBarContainer({
                   barRefs.current[task.id] = el;
                 }}
                 data-task-id={task.id}
+                role="button"
+                tabIndex={0}
+                aria-label={t('a11y.taskBar', {
+                  name: task.name,
+                  start: formatDateFull(offsetToDate(task.startDayOffset)),
+                  end: formatDateFull(endDate),
+                  status: t(STATUS_LABEL_KEYS[task.status]),
+                })}
+                onKeyDown={(e) => handleBarKeyDown(e, task)}
                 className={`task-bar ${task.color ? '' : statusClass(task.status)} ${
                   effCritical ? 'ring-2 ring-red-400' : ''
                 } ${isDropTarget ? (connectCycleBlocked ? 'drop-target-blocked' : 'drop-target') : ''} ${
@@ -649,6 +699,7 @@ export default function TaskBarContainer({
               {/* Right cluster: inner = plain add, outer = add-with-dep (after) */}
               <div
                 className="bar-add-btn right plain"
+                aria-hidden="true"
                 title={t('bar.addAdjacent')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => {
@@ -667,6 +718,7 @@ export default function TaskBarContainer({
               </div>
               <div
                 className="bar-add-btn right dep"
+                aria-hidden="true"
                 title={t('bar.addLinkedSucc')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => handleConnectMouseDown(e, task, 'forward')}

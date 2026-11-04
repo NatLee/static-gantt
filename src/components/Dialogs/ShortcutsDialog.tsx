@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useId } from 'react';
+import Dialog from './Dialog';
 import { X } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
@@ -45,6 +46,15 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    titleKey: 'shortcuts.taskBar',
+    rows: [
+      { keys: ['Enter'], labelKey: 'shortcuts.barOpen' },
+      { keys: ['← / →'], labelKey: 'shortcuts.barMove' },
+      { keys: ['Shift', '← / →'], labelKey: 'shortcuts.barResize' },
+      { keys: ['Shift', 'F10'], labelKey: 'shortcuts.barMenu' },
+    ],
+  },
+  {
     titleKey: 'shortcuts.mermaidEditor',
     rows: [
       { keys: ['⌘/Ctrl', 'Shift', 'S'], labelKey: 'shortcuts.insertSection' },
@@ -57,23 +67,12 @@ const SECTIONS: Section[] = [
 
 export default function ShortcutsDialog({ onClose }: Props) {
   const { t } = useI18n();
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key === '?') {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const titleId = useId();
 
   return (
-    <>
-      <div className="add-dialog-overlay" onClick={onClose} />
-      <div className="add-dialog" style={{ width: 440 }}>
+    <Dialog labelledBy={titleId} onClose={onClose} closeKeys={['?']} style={{ width: 440 }}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+          <h3 id={titleId} className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
             {t('shortcuts.title')}
           </h3>
           <button
@@ -81,6 +80,7 @@ export default function ShortcutsDialog({ onClose }: Props) {
             onClick={onClose}
             type="button"
             title={t('common.close')}
+            aria-label={t('common.close')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -124,7 +124,6 @@ export default function ShortcutsDialog({ onClose }: Props) {
             </div>
           ))}
         </div>
-      </div>
-    </>
+    </Dialog>
   );
 }

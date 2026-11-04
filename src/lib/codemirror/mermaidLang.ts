@@ -1,12 +1,12 @@
 import { StreamLanguage, StreamParser } from '@codemirror/language';
+import { AFTER_KEYWORD, HEADER_KEYWORDS as HEADER_KEYWORD_LIST, SECTION_KEYWORD, TASK_FLAGS } from '../mermaidSyntax';
 
 interface State {
   afterColon: boolean;
 }
 
-const HEADER_KEYWORDS = new Set(['gantt', 'dateFormat', 'axisFormat', 'weekday', 'title']);
-const SECTION_KEYWORD = 'section';
-const STATUS_TOKENS = new Set(['done', 'active', 'crit', 'milestone', 'after']);
+const HEADER_KEYWORDS = new Set<string>(HEADER_KEYWORD_LIST);
+const STATUS_TOKENS = new Set([...TASK_FLAGS, AFTER_KEYWORD]);
 const DURATION_RE = /^\d+(?:\.\d+)?[dwmhs]\b/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?)?/;
 const IDENT_RE = /^[A-Za-z_][\w-]*/;

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useId, useRef } from 'react';
+import Dialog from './Dialog';
 import { Keyboard, MousePointer2, Save, Split, X } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
@@ -35,24 +36,16 @@ const FEATURES: { icon: React.ReactNode; titleKey: MessageKey; bodyKey: MessageK
 
 export default function WelcomeDialog({ onClose, onOpenShortcuts }: Props) {
   const { t } = useI18n();
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key === 'Enter') {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const titleId = useId();
+  // Focus starts on "Let's go", so Enter still closes the dialog as before, while Tab and Enter
+  // can now reach "Show shortcuts" too (a window-wide Enter handler used to swallow it).
+  const primaryRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <>
-      <div className="add-dialog-overlay" onClick={onClose} />
-      <div className="add-dialog" style={{ width: 520 }}>
+    <Dialog labelledBy={titleId} onClose={onClose} initialFocusRef={primaryRef} style={{ width: 520 }}>
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+            <h3 id={titleId} className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
               {t('welcome.title')}
             </h3>
             <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
@@ -64,6 +57,7 @@ export default function WelcomeDialog({ onClose, onOpenShortcuts }: Props) {
             onClick={onClose}
             type="button"
             title={t('common.close')}
+            aria-label={t('common.close')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -111,6 +105,7 @@ export default function WelcomeDialog({ onClose, onOpenShortcuts }: Props) {
             {t('welcome.showShortcuts')}
           </button>
           <button
+            ref={primaryRef}
             className="btn-primary text-xs font-semibold px-5 py-2 rounded-lg cursor-pointer"
             onClick={onClose}
             type="button"
@@ -118,7 +113,6 @@ export default function WelcomeDialog({ onClose, onOpenShortcuts }: Props) {
             {t('welcome.letsGo')}
           </button>
         </div>
-      </div>
-    </>
+    </Dialog>
   );
 }

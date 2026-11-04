@@ -3,6 +3,7 @@
 import { ComputedTask, Baseline } from '@/types';
 import { offsetToDate, formatDateFull } from '@/lib/dateUtils';
 import { useI18n } from '@/i18n/I18nProvider';
+import { STATUS_LABEL_KEYS } from '@/i18n/messages';
 
 interface Props {
   task: ComputedTask;
@@ -16,12 +17,7 @@ export default function TaskTooltip({ task, x, y, baseline }: Props) {
   const startDate = formatDateFull(offsetToDate(task.startDayOffset));
   const endDate = formatDateFull(offsetToDate(task.endDayOffset));
   const progress = typeof task.progress === 'number' ? task.progress : null;
-  const statusLabel =
-    task.status === 'done'
-      ? t('status.done')
-      : task.status === 'in-progress'
-        ? t('status.inProgress')
-        : t('status.planned');
+  const statusLabel = t(STATUS_LABEL_KEYS[task.status]);
 
   const effCritical = task.isOnCriticalPath || task.isCritical;
   const hasSlack = Number.isFinite(task.totalFloat);
@@ -47,6 +43,7 @@ export default function TaskTooltip({ task, x, y, baseline }: Props) {
 
   return (
     <div
+      role="tooltip"
       className="fixed pointer-events-none z-[95] rounded-lg shadow-xl"
       style={{
         left: x + 14,

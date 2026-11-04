@@ -9,6 +9,10 @@ const en = {
   'common.rename': 'Rename',
   'common.duplicate': 'Duplicate',
   'common.download': 'Download',
+  'a11y.taskBar': '{name}, {start} to {end}, {status}',
+  'a11y.toggleGroup': 'Show or hide {name}',
+  'a11y.renameGroup': 'Rename {name}',
+  'a11y.chart': 'Gantt chart',
 
   // top-level menus
   'menu.file': 'File',
@@ -28,6 +32,10 @@ const en = {
   'file.downloadBackup': 'Download backup (all)',
   'file.importJson': 'Import JSON…',
   'file.importFailed': 'Import failed',
+  'import.notJson': 'This file is not valid JSON.',
+  'import.unknownFormat': 'This JSON is not a project file or a backup from this app.',
+  'import.noProjects': 'The backup contains no projects, so nothing was imported.',
+  'import.invalidProject': 'Project "{name}" has missing or broken tasks, so nothing was imported.',
 
   // Edit menu
   'edit.undo': 'Undo',
@@ -67,7 +75,7 @@ const en = {
 
   // Export menu
   'export.gantt': 'Gantt',
-  'export.csv': 'CSV (Excel)',
+  'export.csv': 'Excel (.xlsx)',
   'export.png': 'PNG',
   'export.jsonProject': 'JSON (current project)',
   'export.mermaid': 'Mermaid',
@@ -89,7 +97,7 @@ const en = {
   'about.featureVisual': 'Drag-and-drop scheduling with dependencies & critical path',
   'about.featureMermaid': 'Two-way Mermaid Gantt editing',
   'about.featureAutosave': 'Auto-save & multiple projects in your browser',
-  'about.featureExport': 'Export to PNG, CSV and Mermaid',
+  'about.featureExport': 'Export to PNG, Excel and Mermaid',
   'about.builtWith': 'Built with Next.js, React & TypeScript',
 
   // Mode segmented + header buttons
@@ -157,6 +165,7 @@ const en = {
   'switcher.manage': 'Manage projects…',
   'switcher.saving': 'Saving…',
   'switcher.saved': 'Saved',
+  'switcher.saveFailed': 'Not saved: the browser refused to store this project (its storage may be full). Download a backup to keep your work.',
 
   // Add/Edit dialog
   'dialog.addPhase.title': 'Add New Phase',
@@ -318,6 +327,11 @@ const en = {
   'shortcuts.insertTask': 'Insert task',
   'shortcuts.insertMilestone': 'Insert milestone',
   'shortcuts.format': 'Format',
+  'shortcuts.taskBar': 'Focused task bar',
+  'shortcuts.barOpen': 'Open the task editor',
+  'shortcuts.barMove': 'Move one day earlier / later',
+  'shortcuts.barResize': 'Shorten / lengthen by one day',
+  'shortcuts.barMenu': 'Open the task menu',
 
   // Welcome dialog
   'welcome.title': 'Welcome 👋',

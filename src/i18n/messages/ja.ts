@@ -8,6 +8,10 @@ const ja: Record<MessageKey, string> = {
   'common.rename': '名前を変更',
   'common.duplicate': '複製',
   'common.download': 'ダウンロード',
+  'a11y.taskBar': '{name}、{start}〜{end}、{status}',
+  'a11y.toggleGroup': '「{name}」の表示を切り替え',
+  'a11y.renameGroup': '「{name}」の名前を変更',
+  'a11y.chart': 'ガントチャート',
 
   // top-level menus
   'menu.file': 'ファイル',
@@ -27,6 +31,10 @@ const ja: Record<MessageKey, string> = {
   'file.downloadBackup': 'バックアップをダウンロード（全件）',
   'file.importJson': 'JSON をインポート…',
   'file.importFailed': 'インポートに失敗しました',
+  'import.notJson': 'このファイルは有効な JSON ではありません。',
+  'import.unknownFormat': 'この JSON は、このアプリのプロジェクトファイルでもバックアップでもありません。',
+  'import.noProjects': 'バックアップにプロジェクトが含まれていないため、何もインポートしませんでした。',
+  'import.invalidProject': 'プロジェクト「{name}」のタスクが欠けているか壊れているため、何もインポートしませんでした。',
 
   // Edit menu
   'edit.undo': '元に戻す',
@@ -66,7 +74,7 @@ const ja: Record<MessageKey, string> = {
 
   // Export menu
   'export.gantt': 'ガント',
-  'export.csv': 'CSV（Excel）',
+  'export.csv': 'Excel（.xlsx）',
   'export.png': 'PNG',
   'export.jsonProject': 'JSON（現在のプロジェクト）',
   'export.mermaid': 'Mermaid',
@@ -88,7 +96,7 @@ const ja: Record<MessageKey, string> = {
   'about.featureVisual': '依存関係とクリティカルパスに対応したドラッグ＆ドロップのスケジューリング',
   'about.featureMermaid': 'Mermaid ガントチャートの双方向編集',
   'about.featureAutosave': '自動保存とブラウザー内での複数プロジェクト管理',
-  'about.featureExport': 'PNG・CSV・Mermaid へのエクスポート',
+  'about.featureExport': 'PNG・Excel・Mermaid へのエクスポート',
   'about.builtWith': 'Next.js・React・TypeScript で構築',
 
   // Mode segmented + header buttons
@@ -156,6 +164,7 @@ const ja: Record<MessageKey, string> = {
   'switcher.manage': 'プロジェクトを管理…',
   'switcher.saving': '保存中…',
   'switcher.saved': '保存しました',
+  'switcher.saveFailed': '保存できません：ブラウザーがこのプロジェクトの保存を拒否しました（容量不足の可能性があります）。作業を失わないよう、バックアップをダウンロードしてください。',
 
   // Add/Edit dialog
   'dialog.addPhase.title': 'フェーズを追加',
@@ -317,6 +326,11 @@ const ja: Record<MessageKey, string> = {
   'shortcuts.insertTask': 'タスクを挿入',
   'shortcuts.insertMilestone': 'マイルストーンを挿入',
   'shortcuts.format': '整形',
+  'shortcuts.taskBar': 'フォーカス中のタスクバー',
+  'shortcuts.barOpen': 'タスク編集を開く',
+  'shortcuts.barMove': '1 日前／後へ移動',
+  'shortcuts.barResize': '期間を 1 日短く／長く',
+  'shortcuts.barMenu': 'タスクメニューを開く',
 
   // Welcome dialog
   'welcome.title': 'ようこそ 👋',

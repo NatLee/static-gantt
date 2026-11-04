@@ -1,9 +1,11 @@
 'use client';
 
-import { Dispatch, useEffect, useState, useRef, useCallback } from 'react';
+import { Dispatch, KeyboardEvent, useState, useCallback, useId } from 'react';
+import Dialog from './Dialog';
 import { GanttState, GanttAction, Task } from '@/types';
-import { genId, formatISO } from '@/lib/dateUtils';
+import { genId, todayISO } from '@/lib/dateUtils';
 import { MS_COLORS } from '@/data/defaultProject';
+import { DEFAULT_SUB_PHASE, joinPhase, masterOf } from '@/lib/phase';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { TFunction } from '@/i18n/I18nProvider';
 
@@ -17,51 +19,30 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
   const { t } = useI18n();
   const dialog = state.activeDialog;
 
-  // Form fields
-  const [phaseName, setPhaseName] = useState('');
-  const [subPhaseName, setSubPhaseName] = useState('');
+  // Form fields. GanttApp mounts a fresh AddDialog (new `key`) for every dialog it opens, so
+  // these start from the dialog's context; edit dialogs are pre-filled with the current values.
+  // The edit-milestone trigger only passes { milestoneId }, so the milestone is looked up to
+  // pre-fill its name and date (otherwise "Save" with empty fields silently no-ops).
+  const editedMilestone =
+    dialog?.type === 'edit-milestone'
+      ? state.milestones.find(m => m.id === dialog.context.milestoneId)
+      : undefined;
+  const [phaseName, setPhaseName] = useState(() =>
+    dialog?.type === 'edit-phase' ? dialog.context.phase || dialog.context.masterPhase || '' : ''
+  );
+  const [subPhaseName, setSubPhaseName] = useState(() =>
+    dialog?.type === 'edit-sub-phase' ? dialog.context.subPhase || '' : ''
+  );
   const [taskName, setTaskName] = useState('');
   const [duration, setDuration] = useState(5);
-  const [milestoneName, setMilestoneName] = useState('');
-  const [milestoneDate, setMilestoneDate] = useState('');
+  const [milestoneName, setMilestoneName] = useState(() =>
+    dialog?.type === 'edit-milestone' ? dialog.context.name || editedMilestone?.name || '' : ''
+  );
+  const [milestoneDate, setMilestoneDate] = useState(() =>
+    dialog?.type === 'edit-milestone' ? dialog.context.date || editedMilestone?.date || '' : ''
+  );
 
-  const firstInputRef = useRef<HTMLInputElement>(null);
-
-  // Reset form when dialog changes
-  useEffect(() => {
-    if (!dialog) return;
-
-    setPhaseName('');
-    setSubPhaseName('');
-    setTaskName('');
-    setDuration(5);
-    setMilestoneName('');
-    setMilestoneDate('');
-
-    // Pre-populate for edit dialogs
-    if (dialog.type === 'edit-phase' && (dialog.context.phase || dialog.context.masterPhase)) {
-      setPhaseName(dialog.context.phase || dialog.context.masterPhase);
-    }
-    if (dialog.type === 'edit-sub-phase' && dialog.context.subPhase) {
-      setSubPhaseName(dialog.context.subPhase);
-    }
-    if (dialog.type === 'edit-milestone') {
-      // The edit trigger only passes { milestoneId }, so look the milestone up
-      // from state to pre-fill the current name/date (otherwise both fields
-      // open blank and a "Save" with empty fields silently no-ops).
-      const ms = state.milestones.find(m => m.id === dialog.context.milestoneId);
-      setMilestoneName(dialog.context.name || ms?.name || '');
-      setMilestoneDate(dialog.context.date || ms?.date || '');
-    }
-
-    // Auto-focus first input
-    setTimeout(() => {
-      firstInputRef.current?.focus();
-    }, 50);
-    // Intentionally only re-run when the dialog identity changes; we snapshot
-    // milestones at open time and must not reset fields on later state changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dialog]);
+  const titleId = useId();
 
   const handleClose = useCallback(() => {
     dispatch({ type: 'CLOSE_DIALOG' });
@@ -93,10 +74,10 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
     switch (dialog.type) {
       case 'add-phase': {
         const lastId = findLastTaskId();
-        const sub = subPhaseName.trim() || 'General';
+        const sub = subPhaseName.trim() || DEFAULT_SUB_PHASE;
         const newTask: Task = {
           id: genId(),
-          phase: `${phaseName.trim() || 'Phase'} ${sub}`,
+          phase: joinPhase(phaseName.trim() || 'Phase', sub),
           name: taskName.trim() || t('default.newTask'),
           duration: Math.max(1, duration),
           status: 'planned',
@@ -104,7 +85,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           // Link after the last existing task so the new phase lands at the end
           // of the schedule; if the project is empty, anchor to today so the
           // bar is actually schedulable (an unanchored task renders as NaN).
-          ...(lastId ? { after: lastId } : { start: formatISO(new Date()) }),
+          ...(lastId ? { after: lastId } : { start: todayISO() }),
         };
         dispatch({ type: 'ADD_TASK', task: newTask });
         break;
@@ -112,20 +93,17 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
 
       case 'add-sub-phase': {
         const masterPhase = dialog.context.masterPhase;
-        // Match only tasks within THIS master phase. Using a bare prefix would
-        // let "Phase 1" also match "Phase 10", "Phase 11", … — use a boundary.
-        const inMaster = (t: Task) =>
-          t.phase === masterPhase || t.phase.startsWith(`${masterPhase} `);
+        const inMaster = (t: Task) => masterOf(t.phase) === masterPhase;
         const lastId = findLastTaskId(inMaster);
         const lastIdx = findLastTaskIndex(inMaster);
         const newTask: Task = {
           id: genId(),
-          phase: `${masterPhase} ${subPhaseName.trim() || 'General'}`,
+          phase: joinPhase(masterPhase, subPhaseName.trim() || DEFAULT_SUB_PHASE),
           name: taskName.trim() || t('default.newTask'),
           duration: Math.max(1, duration),
           status: 'planned',
           isCritical: false,
-          ...(lastId ? { after: lastId } : { start: formatISO(new Date()) }),
+          ...(lastId ? { after: lastId } : { start: todayISO() }),
         };
         dispatch({ type: 'ADD_TASK', task: newTask, afterIndex: lastIdx });
         break;
@@ -140,15 +118,13 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         if (!fullPhase && dialog.context.masterPhase) {
           const m = dialog.context.masterPhase;
           if (dialog.context.subPhase) {
-            fullPhase = `${m} ${dialog.context.subPhase}`;
+            fullPhase = joinPhase(m, dialog.context.subPhase);
           } else {
-            const firstInMaster = state.tasks.find(
-              t => t.phase === m || t.phase.startsWith(`${m} `)
-            );
-            fullPhase = firstInMaster ? firstInMaster.phase : `${m} General`;
+            const firstInMaster = state.tasks.find(t => masterOf(t.phase) === m);
+            fullPhase = firstInMaster ? firstInMaster.phase : joinPhase(m, DEFAULT_SUB_PHASE);
           }
         }
-        if (!fullPhase) fullPhase = 'Phase 1 General';
+        if (!fullPhase) fullPhase = joinPhase('Phase 1', DEFAULT_SUB_PHASE);
 
         const afterTaskId = dialog.context.afterTaskId;
         // Find last task in this phase to link after
@@ -165,7 +141,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           isCritical: false,
           // Anchor to today when there's no predecessor to chain after, so the
           // first task in a phase/project is always visible.
-          ...(linkAfter ? { after: linkAfter } : { start: formatISO(new Date()) }),
+          ...(linkAfter ? { after: linkAfter } : { start: todayISO() }),
         };
         dispatch({ type: 'ADD_TASK', task: newTask, afterIndex: afterIdx >= 0 ? afterIdx : undefined });
         break;
@@ -271,20 +247,13 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
     dispatch({ type: 'CLOSE_DIALOG' });
   }, [dialog, dispatch]);
 
-  // Enter key submits
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        const active = document.activeElement;
-        if (active && active.tagName === 'BUTTON') return;
-        handleSubmit();
-      } else if (e.key === 'Escape') {
-        handleClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSubmit, handleClose]);
+  // Enter submits from any field (buttons keep their own Enter).
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+    e.preventDefault();
+    handleSubmit();
+  };
 
   if (!dialog) return null;
 
@@ -293,21 +262,17 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
   const showDeleteButton = dialog.type === 'edit-phase' || dialog.type === 'edit-sub-phase' || dialog.type === 'edit-milestone';
 
   return (
-    <>
-      {/* Overlay */}
-      <div className="add-dialog-overlay" onClick={handleClose} />
-
-      {/* Dialog */}
-      <div className="add-dialog">
+    <Dialog labelledBy={titleId} onClose={handleClose} onKeyDown={handleKeyDown}>
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm"
             style={{ background: dialogConfig.iconBg }}
+            aria-hidden="true"
           >
             {dialogConfig.icon}
           </div>
-          <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+          <h3 id={titleId} className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
             {dialogConfig.title}
           </h3>
         </div>
@@ -348,8 +313,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
             </button>
           </div>
         </div>
-      </div>
-    </>
+    </Dialog>
   );
 
   function renderFields(type: string) {
@@ -359,7 +323,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           <>
             <FieldGroup label={t('field.phaseName')}>
               <input
-                ref={firstInputRef}
                 type="text"
                 className="input-field"
                 placeholder={t('ph.phase')}
@@ -402,7 +365,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           <>
             <FieldGroup label={t('field.subPhaseName')}>
               <input
-                ref={firstInputRef}
                 type="text"
                 className="input-field"
                 placeholder={t('ph.testing')}
@@ -438,7 +400,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           <>
             <FieldGroup label={t('field.taskName')}>
               <input
-                ref={firstInputRef}
                 type="text"
                 className="input-field"
                 placeholder={t('ph.implement')}
@@ -462,7 +423,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         return (
           <FieldGroup label={t('field.phaseName')}>
             <input
-              ref={firstInputRef}
               type="text"
               className="input-field"
               value={phaseName}
@@ -475,7 +435,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         return (
           <FieldGroup label={t('field.subPhaseName')}>
             <input
-              ref={firstInputRef}
               type="text"
               className="input-field"
               value={subPhaseName}
@@ -489,7 +448,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           <>
             <FieldGroup label={t('field.milestoneName')}>
               <input
-                ref={firstInputRef}
                 type="text"
                 className="input-field"
                 placeholder={t('ph.betaRelease')}
@@ -513,7 +471,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           <>
             <FieldGroup label={t('field.milestoneName')}>
               <input
-                ref={firstInputRef}
                 type="text"
                 className="input-field"
                 value={milestoneName}
@@ -537,14 +494,15 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
   }
 }
 
+/** A field with its caption. The <label> wraps the control, so the caption is its accessible name. */
 function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
         {label}
-      </label>
+      </span>
       {children}
-    </div>
+    </label>
   );
 }
 

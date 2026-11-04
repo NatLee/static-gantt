@@ -1,24 +1,25 @@
 'use client';
 
-import { Dispatch, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
-import { GanttAction, Task } from '@/types';
+import { Task } from '@/types';
 import { useI18n } from '@/i18n/I18nProvider';
 
 interface Props {
   tasks: Task[];
-  dispatch: Dispatch<GanttAction>;
   onClose: () => void;
   onPick: (taskId: string) => void;
 }
 
 const MAX_RESULTS = 10;
 
-export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props) {
+export default function SearchPanel({ tasks, onClose, onPick }: Props) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listId = useId();
+  const optionId = (i: number) => `${listId}-${i}`;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -46,9 +47,8 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
     return matches.slice(0, MAX_RESULTS).map(m => m.task);
   }, [query, tasks]);
 
-  useEffect(() => {
-    if (selectedIndex >= results.length) setSelectedIndex(0);
-  }, [results.length, selectedIndex]);
+  // The highlighted row, kept inside the current results when they shrink.
+  const active = selectedIndex < results.length ? selectedIndex : 0;
 
   const pick = useCallback(
     (task: Task) => {
@@ -79,11 +79,11 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
       }
       if (e.key === 'Enter') {
         e.preventDefault();
-        const t = results[selectedIndex];
+        const t = results[active];
         if (t) pick(t);
       }
     },
-    [results, selectedIndex, pick, onClose]
+    [results, active, pick, onClose]
   );
 
   return (
@@ -103,9 +103,18 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
         <input
           ref={inputRef}
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => {
+            setQuery(e.target.value);
+            setSelectedIndex(0);
+          }}
           onKeyDown={handleKeyDown}
           placeholder={t('search.placeholder')}
+          aria-label={t('search.placeholder')}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={results.length > 0}
+          aria-controls={listId}
+          aria-activedescendant={results.length > 0 ? optionId(active) : undefined}
           className="flex-1 bg-transparent outline-none text-sm"
           style={{ color: 'var(--text-primary)' }}
         />
@@ -114,13 +123,14 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
           onClick={onClose}
           type="button"
           title={t('search.close')}
+          aria-label={t('search.close')}
         >
           <X className="w-3 h-3" />
         </button>
       </div>
 
       {query.trim() && (
-        <div className="max-h-80 overflow-auto">
+        <div className="max-h-80 overflow-auto" role="listbox" id={listId} aria-label={t('search.placeholder')}>
           {results.length === 0 ? (
             <div
               className="px-3 py-4 text-xs text-center"
@@ -132,11 +142,15 @@ export default function SearchPanel({ tasks, dispatch, onClose, onPick }: Props)
             results.map((task, i) => (
               <button
                 key={task.id}
+                id={optionId(i)}
+                role="option"
+                aria-selected={i === active}
+                tabIndex={-1}
                 className="w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer transition-colors"
                 style={{
-                  background: i === selectedIndex ? 'var(--accent-glow)' : 'transparent',
+                  background: i === active ? 'var(--accent-glow)' : 'transparent',
                   color: 'var(--text-primary)',
-                  borderLeft: `3px solid ${i === selectedIndex ? 'var(--accent)' : 'transparent'}`,
+                  borderLeft: `3px solid ${i === active ? 'var(--accent)' : 'transparent'}`,
                 }}
                 onClick={() => pick(task)}
                 onMouseEnter={() => setSelectedIndex(i)}

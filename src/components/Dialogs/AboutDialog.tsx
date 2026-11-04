@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useId } from 'react';
+import Dialog from './Dialog';
 import { X, Layers, MousePointerClick, GitBranch, Save, Download } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
@@ -19,24 +20,12 @@ const FEATURES: { icon: LucideIcon; key: MessageKey }[] = [
 
 export default function AboutDialog({ onClose }: Props) {
   const { t } = useI18n();
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const titleId = useId();
 
   return (
-    <>
-      <div className="add-dialog-overlay" onClick={onClose} />
-      <div className="add-dialog" style={{ width: 420 }}>
+    <Dialog labelledBy={titleId} onClose={onClose} style={{ width: 420 }}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+          <h3 id={titleId} className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
             {t('help.about')}
           </h3>
           <button
@@ -44,6 +33,7 @@ export default function AboutDialog({ onClose }: Props) {
             onClick={onClose}
             type="button"
             title={t('common.close')}
+            aria-label={t('common.close')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -89,7 +79,6 @@ export default function AboutDialog({ onClose }: Props) {
         >
           {t('about.builtWith')}
         </div>
-      </div>
-    </>
+    </Dialog>
   );
 }

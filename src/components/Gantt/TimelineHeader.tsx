@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { offsetToDate, formatDateFull } from '@/lib/dateUtils';
+import { offsetToCalendar, offsetToDate, formatDateFull } from '@/lib/dateUtils';
 import { useI18n } from '@/i18n/I18nProvider';
 
 import { PIXELS_PER_DAY } from '@/lib/ganttLayout';
@@ -25,17 +25,16 @@ export default function TimelineHeader({
 
   const monthCells = useMemo(() => {
     // Locale-aware short month name (e.g. "Mar" / "3月" / "3月") for the narrow header.
-    const monthFmt = new Intl.DateTimeFormat(locale, { month: 'short' });
-    const monthShort = (year: number, month: number) => monthFmt.format(new Date(year, month, 1));
+    // Days are UTC-midnight dates (see dateUtils), so format them in UTC too.
+    const monthFmt = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' });
+    const monthShort = (year: number, month: number) => monthFmt.format(new Date(Date.UTC(year, month, 1)));
     const cells: { label: string; left: number; width: number; idx: number }[] = [];
     let curMonth = -1;
     let curYear = -1;
     let monthStart = 0;
 
     for (let d = 0; d <= totalDays; d++) {
-      const date = offsetToDate(timelineStartDay + d);
-      const m = date.getMonth();
-      const y = date.getFullYear();
+      const { month: m, year: y } = offsetToCalendar(timelineStartDay + d);
 
       if (m !== curMonth || y !== curYear) {
         if (curMonth !== -1) {
@@ -75,10 +74,9 @@ export default function TimelineHeader({
       // Individual day cells
       const cells: { label: string; left: number; width: number; isWeekend: boolean }[] = [];
       for (let d = 0; d < totalDays; d++) {
-        const date = offsetToDate(timelineStartDay + d);
-        const dow = date.getDay();
+        const { day, weekday: dow } = offsetToCalendar(timelineStartDay + d);
         cells.push({
-          label: String(date.getDate()),
+          label: String(day),
           left: d * ppd,
           width: ppd,
           isWeekend: dow === 0 || dow === 6,
@@ -90,8 +88,7 @@ export default function TimelineHeader({
       const cells: { label: string; left: number; width: number }[] = [];
       let weekStart = 0;
       for (let d = 0; d < totalDays; d++) {
-        const date = offsetToDate(timelineStartDay + d);
-        const dow = date.getDay();
+        const { weekday: dow } = offsetToCalendar(timelineStartDay + d);
         if (dow === 1 && d > 0) {
           const startDate = offsetToDate(timelineStartDay + weekStart);
           cells.push({

@@ -1,4 +1,5 @@
 import { Task } from '@/types';
+import { formatAfter, parseAfter } from './dependencies';
 
 export function rewireDependencies(tasks: Task[], deletedIds: string | string[]): Task[] {
   const deletedSet = new Set(Array.isArray(deletedIds) ? deletedIds : [deletedIds]);
@@ -11,7 +12,7 @@ export function rewireDependencies(tasks: Task[], deletedIds: string | string[])
     if (!t) return { afterIds: [], start: null };
     if (!deletedSet.has(taskId)) return { afterIds: [taskId], start: null };
     if (t.after) {
-      const pres = t.after.split(',').map(s => s.trim());
+      const pres = parseAfter(t.after);
       const alive: string[] = [];
       let inheritStart: string | null = null;
       for (const pid of pres) {
@@ -27,7 +28,7 @@ export function rewireDependencies(tasks: Task[], deletedIds: string | string[])
 
   result.forEach(t => {
     if (deletedSet.has(t.id) || !t.after) return;
-    const parts = t.after.split(',').map(s => s.trim());
+    const parts = parseAfter(t.after);
     const newParts: string[] = [];
     let inheritStart: string | null = null;
     for (const pid of parts) {
@@ -39,9 +40,9 @@ export function rewireDependencies(tasks: Task[], deletedIds: string | string[])
         newParts.push(pid);
       }
     }
-    const unique = [...new Set(newParts)];
-    if (unique.length > 0) {
-      t.after = unique.join(',');
+    const after = formatAfter(newParts);
+    if (after) {
+      t.after = after;
     } else if (inheritStart) {
       t.start = inheritStart;
       delete t.after;

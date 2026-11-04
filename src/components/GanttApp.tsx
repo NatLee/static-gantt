@@ -15,23 +15,29 @@ import EmptyState from '@/components/Gantt/EmptyState';
 import { RowHoverProvider } from '@/hooks/useRowHover';
 import { defaultTasks } from '@/data/defaultProject';
 import SearchPanel from '@/components/Gantt/SearchPanel';
-import { parseMermaidToTasks } from '@/lib/mermaidParser';
-import { dateToOffset } from '@/lib/dateUtils';
-import { PIXELS_PER_DAY } from '@/lib/ganttLayout';
+import { parseMermaid } from '@/lib/mermaidParser';
+import { applyMermaid } from '@/lib/mermaidSync';
+import { todayOffset } from '@/lib/dateUtils';
+import { PIXELS_PER_DAY, ZOOM_PRESETS, type ZoomPreset } from '@/lib/ganttLayout';
 import dynamic from 'next/dynamic';
 import type { MermaidPanelHandle } from '@/components/Mermaid/MermaidPanel';
 import { useI18n } from '@/i18n/I18nProvider';
 
-const ZOOM_PRESETS = {
-  day: 4,     // ppd 20
-  week: 2,    // ppd 10
-  month: 0.8, // ppd 4
-} as const;
-export type ZoomPreset = keyof typeof ZOOM_PRESETS;
 
 const MermaidPanel = dynamic(() => import('@/components/Mermaid/MermaidPanel'), {
   ssr: false,
 });
+
+/** localStorage flag set once the welcome dialog has been dismissed. */
+const WELCOME_SEEN_KEY = 'gantt-welcome-seen';
+
+function hasSeenWelcome(): boolean {
+  try {
+    return !!localStorage.getItem(WELCOME_SEEN_KEY);
+  } catch {
+    return true; // storage unavailable: don't nag on every visit
+  }
+}
 
 export default function GanttApp() {
   const {
@@ -42,6 +48,7 @@ export default function GanttApp() {
     taskMap,
     masterPhases,
     projects,
+    hydrated,
     saveStatus,
     undo,
     redo,
@@ -49,51 +56,46 @@ export default function GanttApp() {
     canRedo,
   } = usePersistentGanttState();
   const { t } = useI18n();
+  const activeProjectName = projects.activeProjectName || t('about.appName');
   const mermaidRef = useRef<MermaidPanelHandle>(null);
   const prevModeRef = useRef(state.currentMode);
   const [projectListOpen, setProjectListOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  // First-visit welcome, shown once ever. Read only after saved data has loaded (the prebuilt
+  // page has no localStorage), so the first render matches the static HTML.
+  const welcomeOpen = hydrated && !welcomeDismissed && !hasSeenWelcome();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', state.isDark ? 'dark' : 'light');
   }, [state.isDark]);
 
-  // First-visit welcome: flag stored once-ever, never shown again after dismiss
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem('gantt-welcome-seen')) {
-        setWelcomeOpen(true);
-      }
-    } catch {
-      // localStorage unavailable, skip
-    }
-  }, []);
-
   const handleCloseWelcome = useCallback(() => {
     try {
-      localStorage.setItem('gantt-welcome-seen', '1');
+      localStorage.setItem(WELCOME_SEEN_KEY, '1');
     } catch {
-      // ignore
+      // ignore: the dialog just shows again next time
     }
-    setWelcomeOpen(false);
+    setWelcomeDismissed(true);
   }, []);
 
   const handleLoadSample = useCallback(() => {
     dispatch({ type: 'REPLACE_ALL_TASKS', tasks: defaultTasks });
   }, [dispatch]);
 
-  // When switching from mermaid back to visual, parse the code and replace tasks
+  // When switching from mermaid back to visual, read the text back into the project. Fields
+  // Mermaid cannot express (progress, colours, assignees, …) are kept by task id.
+  const contentRef = useRef({ tasks: state.tasks, milestones: state.milestones });
   useEffect(() => {
-    if (prevModeRef.current === 'mermaid' && state.currentMode === 'visual') {
-      if (mermaidRef.current) {
-        const code = mermaidRef.current.getCode();
-        const newTasks = parseMermaidToTasks(code);
-        if (newTasks.length > 0) {
-          dispatch({ type: 'REPLACE_ALL_TASKS', tasks: newTasks });
-        }
+    contentRef.current = { tasks: state.tasks, milestones: state.milestones };
+  }, [state.tasks, state.milestones]);
+  useEffect(() => {
+    if (prevModeRef.current === 'mermaid' && state.currentMode === 'visual' && mermaidRef.current) {
+      const parsed = parseMermaid(mermaidRef.current.getCode());
+      if (parsed.tasks.length > 0) {
+        dispatch({ type: 'REPLACE_ALL_TASKS', ...applyMermaid(contentRef.current, parsed) });
       }
     }
     prevModeRef.current = state.currentMode;
@@ -131,9 +133,9 @@ export default function GanttApp() {
     if (state.currentMode !== 'visual') return;
     const container = document.getElementById('gantt-scroll-container');
     if (!container) return;
-    const todayOffset = dateToOffset(new Date());
+    const today = todayOffset();
     const ppd = PIXELS_PER_DAY * state.zoomScale;
-    const x = (todayOffset - state.timelineStartDay) * ppd;
+    const x = (today - state.timelineStartDay) * ppd;
     const viewportWidth = container.clientWidth;
     container.scrollTo({
       left: Math.max(0, x - viewportWidth / 2),
@@ -157,7 +159,7 @@ export default function GanttApp() {
     const available = container.clientWidth - sidebarPx - 24;
     if (available <= 0) return;
     const ppd = available / totalDays;
-    const scale = Math.max(0.2, Math.min(5, ppd / PIXELS_PER_DAY));
+    const scale = ppd / PIXELS_PER_DAY; // the reducer keeps it within MIN_ZOOM..MAX_ZOOM
     dispatch({ type: 'SET_ZOOM', scale });
   }, [dispatch, state.timelineStartDay, state.timelineEndDay]);
 
@@ -175,9 +177,9 @@ export default function GanttApp() {
     const scrollContainer = document.getElementById('gantt-scroll-container');
     if (!target || !scrollContainer) return;
     import('@/lib/exportPng').then(({ exportToPNG }) => {
-      exportToPNG(target, scrollContainer, state.isDark, state.currentFilter, t('export.pngFailed'));
+      exportToPNG(target, scrollContainer, state.isDark, state.currentFilter, activeProjectName, t('export.pngFailed'));
     });
-  }, [state.isDark, state.currentFilter, t]);
+  }, [state.isDark, state.currentFilter, activeProjectName, t]);
 
   const mermaidInsertSection = useCallback(() => mermaidRef.current?.insertSection?.(), []);
   const mermaidInsertTask = useCallback(() => mermaidRef.current?.insertTask?.(), []);
@@ -244,7 +246,13 @@ export default function GanttApp() {
         onMermaidExportPNG={mermaidExportPNG}
       />
 
-      {state.currentMode === 'visual' ? (
+      {/* The chart depends on today's date and on the project saved in this browser, neither of
+          which exists when the static page is built. Render it only after loading, so the
+          prebuilt HTML and the first client render agree (no hydration mismatch) and the sample
+          project never flashes up before the user's own one. */}
+      {!hydrated ? (
+        <main className="flex-1" aria-busy="true" />
+      ) : state.currentMode === 'visual' ? (
         state.tasks.length === 0 ? (
           <EmptyState dispatch={dispatch} onLoadDefault={handleLoadSample} />
         ) : (
@@ -254,7 +262,6 @@ export default function GanttApp() {
               dispatch={dispatch}
               computed={computed}
               hierarchy={hierarchy}
-              taskMap={taskMap}
             />
           </RowHoverProvider>
         )
@@ -262,6 +269,7 @@ export default function GanttApp() {
         <MermaidPanel
           ref={mermaidRef}
           state={state}
+          title={activeProjectName}
         />
       )}
 
@@ -277,6 +285,7 @@ export default function GanttApp() {
 
       {state.activeDialog !== null && (
         <AddDialog
+          key={`${state.activeDialog.type}:${JSON.stringify(state.activeDialog.context)}`}
           state={state}
           dispatch={dispatch}
           masterPhases={masterPhases}
@@ -301,7 +310,6 @@ export default function GanttApp() {
       {searchOpen && state.currentMode === 'visual' && (
         <SearchPanel
           tasks={state.tasks}
-          dispatch={dispatch}
           onClose={handleCloseSearch}
           onPick={handlePickSearchResult}
         />

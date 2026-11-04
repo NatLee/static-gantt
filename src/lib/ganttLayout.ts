@@ -19,3 +19,22 @@ export const Z = {
   panel: 200,
   dialog: 300,
 } as const;
+
+/** Zoom presets; zoom × PIXELS_PER_DAY = pixels per day (day 20, week 10, month 4). */
+export const ZOOM_PRESETS = {
+  day: 4,
+  week: 2,
+  month: 0.8,
+} as const;
+export type ZoomPreset = keyof typeof ZOOM_PRESETS;
+
+export const MIN_ZOOM = 0.2;
+export const MAX_ZOOM = 5;
+
+/** Zoom of a new project: the week view, where a task of a few days is still a readable bar. */
+export const DEFAULT_ZOOM = ZOOM_PRESETS.week;
+
+/** Which preset button to highlight for a zoom level. */
+export function zoomPresetFor(scale: number): ZoomPreset {
+  return scale >= 3 ? 'day' : scale >= 1.6 ? 'week' : 'month';
+}

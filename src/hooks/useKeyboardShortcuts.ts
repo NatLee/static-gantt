@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 
 export interface ShortcutHandlers {
   undo?: () => void;
@@ -23,8 +23,11 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
+  // Keep the latest handlers for the one window listener below (updated after each render).
   const ref = useRef(handlers);
-  ref.current = handlers;
+  useLayoutEffect(() => {
+    ref.current = handlers;
+  });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

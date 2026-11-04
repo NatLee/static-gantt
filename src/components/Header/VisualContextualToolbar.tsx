@@ -12,7 +12,7 @@ import {
 import { Segmented, SegmentedButton } from './Segmented';
 import PhaseTabs from './PhaseTabs';
 import type { GanttAction, GanttState } from '@/types';
-import type { ZoomPreset } from '@/components/GanttApp';
+import { zoomPresetFor, type ZoomPreset } from '@/lib/ganttLayout';
 import { useI18n } from '@/i18n/I18nProvider';
 
 interface Props {
@@ -41,8 +41,7 @@ export default function VisualContextualToolbar({
   onFitToScreen,
 }: Props) {
   const { t } = useI18n();
-  const currentZoomPreset: ZoomPreset =
-    state.zoomScale >= 3 ? 'day' : state.zoomScale >= 1.6 ? 'week' : 'month';
+  const currentZoomPreset = zoomPresetFor(state.zoomScale);
 
   const handleFilterChange = useCallback(
     (filter: string) => {

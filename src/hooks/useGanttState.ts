@@ -1,15 +1,14 @@
 import { useMemo } from 'react';
-import { GanttState, GanttAction, ComputedTask, HierarchyMap } from '@/types';
-import { defaultTasks, defaultMilestones, PROJECT_START_DATE } from '@/data/defaultProject';
+import { GanttState, GanttAction, ComputedTask, HierarchyMap, Task } from '@/types';
+import { defaultTasks, defaultMilestones } from '@/data/defaultProject';
 import { computeSchedule, buildHierarchy, computeTimelineBounds, annotateWorkload } from '@/lib/scheduler';
 import { rewireDependencies } from '@/lib/dependencyRewire';
-import { useUndoableReducer } from './useUndoableReducer';
+import { joinPhase, masterOf, splitPhase } from '@/lib/phase';
+import { formatAfter, parseAfter } from '@/lib/dependencies';
+import { DEFAULT_ZOOM, MAX_ZOOM, MIN_ZOOM } from '@/lib/ganttLayout';
+import { undoable, useUndoableReducer } from './useUndoableReducer';
 
-const initialBounds = computeTimelineBounds(
-  computeSchedule(defaultTasks),
-  defaultMilestones,
-  PROJECT_START_DATE
-);
+const initialBounds = computeTimelineBounds(computeSchedule(defaultTasks), defaultMilestones);
 
 const initialState: GanttState = {
   tasks: defaultTasks,
@@ -17,7 +16,7 @@ const initialState: GanttState = {
   currentFilter: 'ALL',
   currentMode: 'visual',
   isDark: true,
-  zoomScale: 1,
+  zoomScale: DEFAULT_ZOOM,
   collapsedPhases: new Set<string>(),
   collapsedSubPhases: new Set<string>(),
   editingTaskId: null,
@@ -31,7 +30,25 @@ const initialState: GanttState = {
   baseline: null,
 };
 
-function ganttReducer(state: GanttState, action: GanttAction): GanttState {
+/**
+ * Take `updated` out of its current slot and put it back in front of `insertBeforeTaskId`, or,
+ * without one, after the last task of its (new) phase. List order is display order.
+ */
+function moveTaskInto(tasks: Task[], updated: Task, insertBeforeTaskId?: string): Task[] {
+  const rest = tasks.filter(t => t.id !== updated.id);
+  let idx = -1;
+  if (insertBeforeTaskId) {
+    idx = rest.findIndex(t => t.id === insertBeforeTaskId);
+  } else {
+    const lastInPhase = rest.findLastIndex(t => t.phase === updated.phase);
+    if (lastInPhase >= 0) idx = lastInPhase + 1;
+  }
+  if (idx < 0) rest.push(updated);
+  else rest.splice(idx, 0, updated);
+  return rest;
+}
+
+export function ganttReducer(state: GanttState, action: GanttAction): GanttState {
   switch (action.type) {
     case 'SET_FILTER':
       return { ...state, currentFilter: action.filter };
@@ -43,7 +60,7 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
       return { ...state, isDark: !state.isDark };
 
     case 'SET_ZOOM':
-      return { ...state, zoomScale: Math.max(0.2, Math.min(action.scale, 5)) };
+      return { ...state, zoomScale: Math.max(MIN_ZOOM, Math.min(action.scale, MAX_ZOOM)) };
 
     case 'TOGGLE_PHASE_COLLAPSE': {
       const next = new Set(state.collapsedPhases);
@@ -109,10 +126,12 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
       if (targetIdx === -1) return state;
       const newTask = { ...action.task, after: action.targetTaskId };
       delete newTask.start;
-      // Any task that depended on targetTask now depends on the new task
+      // Any task that depended on targetTask now depends on the new task instead,
+      // including tasks that wait for several predecessors.
       tasks.forEach(t => {
-        if (t.after === action.targetTaskId && t.id !== newTask.id) {
-          t.after = newTask.id;
+        const preds = parseAfter(t.after);
+        if (t.id !== newTask.id && preds.includes(action.targetTaskId)) {
+          t.after = formatAfter(preds.map(id => (id === action.targetTaskId ? newTask.id : id)));
         }
       });
       tasks.splice(targetIdx + 1, 0, newTask);
@@ -136,24 +155,21 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
 
     case 'RENAME_PHASE': {
       const tasks = state.tasks.map(t => {
-        const regex = new RegExp(`^${action.oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s+.*)?$`);
-        const m = t.phase.match(regex);
-        if (m) return { ...t, phase: action.newName + (m[1] || '') };
-        return t;
+        const { master, sub } = splitPhase(t.phase);
+        return master === action.oldName ? { ...t, phase: joinPhase(action.newName, sub) } : t;
       });
       return { ...state, tasks };
     }
 
     case 'DELETE_PHASE': {
-      const regex = new RegExp(`^${action.phase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s+.*)?$`);
-      const deletedIds = state.tasks.filter(t => regex.test(t.phase)).map(t => t.id);
+      const deletedIds = state.tasks.filter(t => masterOf(t.phase) === action.phase).map(t => t.id);
       const tasks = rewireDependencies(state.tasks, deletedIds);
       return { ...state, tasks };
     }
 
     case 'RENAME_SUB_PHASE': {
-      const oldFull = `${action.masterPhase} ${action.oldSub}`;
-      const newFull = `${action.masterPhase} ${action.newSub}`;
+      const oldFull = joinPhase(action.masterPhase, action.oldSub);
+      const newFull = joinPhase(action.masterPhase, action.newSub);
       const tasks = state.tasks.map(t =>
         t.phase === oldFull ? { ...t, phase: newFull } : t
       );
@@ -161,14 +177,19 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
     }
 
     case 'DELETE_SUB_PHASE': {
-      const fullPhase = `${action.masterPhase} ${action.subPhase}`;
+      const fullPhase = joinPhase(action.masterPhase, action.subPhase);
       const deletedIds = state.tasks.filter(t => t.phase === fullPhase).map(t => t.id);
       const tasks = rewireDependencies(state.tasks, deletedIds);
       return { ...state, tasks };
     }
 
     case 'REPLACE_ALL_TASKS':
-      return { ...state, tasks: action.tasks, currentFilter: 'ALL' };
+      return {
+        ...state,
+        tasks: action.tasks,
+        milestones: action.milestones ?? state.milestones,
+        currentFilter: 'ALL',
+      };
 
     case 'EXTEND_TIMELINE':
       if (action.direction === 'left') {
@@ -197,34 +218,25 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
     }
 
     case 'REORDER_PHASES': {
-      const phaseRegex = /^(Phase \d+)\s+(.*)/;
       const groups = new Map<string, typeof state.tasks>();
-      const otherTasks: typeof state.tasks = [];
       state.tasks.forEach(t => {
-        const m = t.phase.match(phaseRegex);
-        const master = m ? m[1].trim() : null;
-        if (master) {
-          if (!groups.has(master)) groups.set(master, []);
-          groups.get(master)!.push(t);
-        } else {
-          otherTasks.push(t);
-        }
+        const master = masterOf(t.phase);
+        if (!groups.has(master)) groups.set(master, []);
+        groups.get(master)!.push(t);
       });
       const tasks: typeof state.tasks = [];
       action.orderedPhases.forEach(phase => {
         const group = groups.get(phase);
         if (group) tasks.push(...group);
       });
-      // Append any phases not in orderedPhases + other tasks
+      // Append any phases not in orderedPhases, keeping their current order
       groups.forEach((group, key) => {
         if (!action.orderedPhases.includes(key)) tasks.push(...group);
       });
-      tasks.push(...otherTasks);
       return { ...state, tasks };
     }
 
     case 'REORDER_SUB_PHASES': {
-      const phaseRegex = /^(Phase \d+)\s+(.*)/;
       const masterPhase = action.masterPhase;
       // Split tasks into: before master phase, within master phase (by sub), after master phase
       const before: typeof state.tasks = [];
@@ -233,10 +245,8 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
       let seenMaster = false;
       let pastMaster = false;
       state.tasks.forEach(t => {
-        const m = t.phase.match(phaseRegex);
-        const master = m ? m[1].trim() : null;
-        const sub = m ? m[2].trim() : null;
-        if (master === masterPhase && sub) {
+        const { master, sub } = splitPhase(t.phase);
+        if (master === masterPhase) {
           seenMaster = true;
           if (!subGroups.has(sub)) subGroups.set(sub, []);
           subGroups.get(sub)!.push(t);
@@ -264,25 +274,11 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
       const task = state.tasks.find(t => t.id === action.taskId);
       if (!task) return state;
       const updated = { ...task, phase: action.targetPhase };
-      const tasks = state.tasks.filter(t => t.id !== action.taskId);
-      if (action.insertBeforeTaskId) {
-        const idx = tasks.findIndex(t => t.id === action.insertBeforeTaskId);
-        if (idx >= 0) {
-          tasks.splice(idx, 0, updated);
-        } else {
-          tasks.push(updated);
-        }
-      } else {
-        // Insert after last task in targetPhase
-        let lastIdx = -1;
-        tasks.forEach((t, i) => { if (t.phase === action.targetPhase) lastIdx = i; });
-        if (lastIdx >= 0) {
-          tasks.splice(lastIdx + 1, 0, updated);
-        } else {
-          tasks.push(updated);
-        }
-      }
-      return { ...state, tasks };
+      const tasks = moveTaskInto(state.tasks, updated, action.insertBeforeTaskId);
+      const unchanged =
+        updated.phase === task.phase && tasks.every((t, i) => t.id === state.tasks[i].id);
+      // Dropping a task where it already is must not add an empty undo step.
+      return unchanged ? state : { ...state, tasks };
     }
 
     case 'MOVE_TASK_WITH_REORDER': {
@@ -294,18 +290,7 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
         after: undefined,
         phase: action.targetPhase,
       };
-      const tasks = state.tasks.filter(t => t.id !== action.taskId);
-      if (action.insertBeforeTaskId) {
-        const idx = tasks.findIndex(t => t.id === action.insertBeforeTaskId);
-        if (idx >= 0) tasks.splice(idx, 0, updated);
-        else tasks.push(updated);
-      } else {
-        let lastIdx = -1;
-        tasks.forEach((t, i) => { if (t.phase === action.targetPhase) lastIdx = i; });
-        if (lastIdx >= 0) tasks.splice(lastIdx + 1, 0, updated);
-        else tasks.push(updated);
-      }
-      return { ...state, tasks };
+      return { ...state, tasks: moveTaskInto(state.tasks, updated, action.insertBeforeTaskId) };
     }
 
     case 'SET_HIGHLIGHTED_TASK':
@@ -354,10 +339,9 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
     case 'ADD_TASK_DEPENDENCY': {
       const tasks = state.tasks.map(t => {
         if (t.id !== action.taskId) return t;
-        const existing = t.after ? t.after.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const existing = parseAfter(t.after);
         if (existing.includes(action.predecessorId)) return t;
-        const after = [...existing, action.predecessorId].join(',');
-        const next = { ...t, after };
+        const next = { ...t, after: formatAfter([...existing, action.predecessorId]) };
         delete next.start;
         return next;
       });
@@ -367,13 +351,10 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
     case 'REMOVE_TASK_DEPENDENCY': {
       const tasks = state.tasks.map(t => {
         if (t.id !== action.taskId || !t.after) return t;
-        const remaining = t.after
-          .split(',')
-          .map(s => s.trim())
-          .filter(s => s && s !== action.predecessorId);
+        const remaining = formatAfter(parseAfter(t.after).filter(id => id !== action.predecessorId));
         const next = { ...t };
-        if (remaining.length > 0) {
-          next.after = remaining.join(',');
+        if (remaining) {
+          next.after = remaining;
         } else {
           delete next.after;
           // No predecessors left: anchor the task at its current date so it
@@ -387,15 +368,8 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
       return { ...state, tasks };
     }
 
-    case 'COLLAPSE_ALL_PHASES': {
-      const phaseRegex = /^(Phase \d+)/;
-      const masters = new Set<string>();
-      state.tasks.forEach(t => {
-        const m = t.phase.match(phaseRegex);
-        if (m) masters.add(m[1]);
-      });
-      return { ...state, collapsedPhases: masters };
-    }
+    case 'COLLAPSE_ALL_PHASES':
+      return { ...state, collapsedPhases: new Set(state.tasks.map(t => masterOf(t.phase))) };
 
     case 'EXPAND_ALL_PHASES':
       return { ...state, collapsedPhases: new Set(), collapsedSubPhases: new Set() };
@@ -421,13 +395,13 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
       return { ...state, baseline: null };
 
     case 'MOVE_SUB_PHASE': {
-      const oldPhase = `${action.sourceMasterPhase} ${action.subPhase}`;
-      const newPhase = `${action.targetMasterPhase} ${action.subPhase}`;
+      const oldPhase = joinPhase(action.sourceMasterPhase, action.subPhase);
+      const newPhase = joinPhase(action.targetMasterPhase, action.subPhase);
       const movedTasks = state.tasks.filter(t => t.phase === oldPhase).map(t => ({ ...t, phase: newPhase }));
       if (movedTasks.length === 0) return state;
       const tasks = state.tasks.filter(t => t.phase !== oldPhase);
       if (action.insertBeforeSubPhase) {
-        const targetFullPhase = `${action.targetMasterPhase} ${action.insertBeforeSubPhase}`;
+        const targetFullPhase = joinPhase(action.targetMasterPhase, action.insertBeforeSubPhase);
         const idx = tasks.findIndex(t => t.phase === targetFullPhase);
         if (idx >= 0) {
           tasks.splice(idx, 0, ...movedTasks);
@@ -436,12 +410,7 @@ function ganttReducer(state: GanttState, action: GanttAction): GanttState {
         }
       } else {
         // Insert after last task in targetMasterPhase
-        const phaseRegex = /^(Phase \d+)\s+(.*)/;
-        let lastIdx = -1;
-        tasks.forEach((t, i) => {
-          const m = t.phase.match(phaseRegex);
-          if (m && m[1].trim() === action.targetMasterPhase) lastIdx = i;
-        });
+        const lastIdx = tasks.findLastIndex(t => masterOf(t.phase) === action.targetMasterPhase);
         if (lastIdx >= 0) {
           tasks.splice(lastIdx + 1, 0, ...movedTasks);
         } else {
@@ -477,16 +446,16 @@ const NON_UNDOABLE_ACTIONS = new Set<GanttAction['type']>([
   'SET_WORKING_DAYS',
 ]);
 
-function isUndoable(action: GanttAction): boolean {
-  return !NON_UNDOABLE_ACTIONS.has(action.type);
-}
+/** Undo keeps this many steps. */
+const MAX_UNDO_STEPS = 50;
+
+export const undoableGanttReducer = undoable(ganttReducer, {
+  isUndoable: action => !NON_UNDOABLE_ACTIONS.has(action.type),
+  maxHistory: MAX_UNDO_STEPS,
+});
 
 export function useGanttState() {
-  const [state, dispatch, history] = useUndoableReducer(
-    ganttReducer,
-    initialState,
-    { isUndoable, maxHistory: 50 }
-  );
+  const [state, dispatch, history] = useUndoableReducer(undoableGanttReducer, initialState);
 
   const computed = useMemo<ComputedTask[]>(
     () => annotateWorkload(computeSchedule(state.tasks, { workingDaysOnly: state.workingDaysOnly })),
@@ -502,7 +471,7 @@ export function useGanttState() {
   const masterPhases = useMemo(() => Object.keys(hierarchy), [hierarchy]);
 
   const bounds = useMemo(() => {
-    return computeTimelineBounds(computed, state.milestones, PROJECT_START_DATE);
+    return computeTimelineBounds(computed, state.milestones);
   }, [computed, state.milestones]);
 
   // Auto-extend timeline when bounds change
