@@ -133,7 +133,7 @@ export type GanttAction =
   | { type: 'DELETE_PHASE'; phase: string }
   | { type: 'RENAME_SUB_PHASE'; masterPhase: string; oldSub: string; newSub: string }
   | { type: 'DELETE_SUB_PHASE'; masterPhase: string; subPhase: string }
-  | { type: 'REPLACE_ALL_TASKS'; tasks: Task[] }
+  | { type: 'REPLACE_ALL_TASKS'; tasks: Task[]; milestones?: Milestone[] }
   | { type: 'EXTEND_TIMELINE'; direction: 'left' | 'right'; days: number }
   | { type: 'OPEN_DIALOG'; dialog: DialogState }
   | { type: 'CLOSE_DIALOG' }

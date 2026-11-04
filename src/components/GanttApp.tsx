@@ -15,7 +15,8 @@ import EmptyState from '@/components/Gantt/EmptyState';
 import { RowHoverProvider } from '@/hooks/useRowHover';
 import { defaultTasks } from '@/data/defaultProject';
 import SearchPanel from '@/components/Gantt/SearchPanel';
-import { parseMermaidToTasks } from '@/lib/mermaidParser';
+import { parseMermaid } from '@/lib/mermaidParser';
+import { applyMermaid } from '@/lib/mermaidSync';
 import { todayOffset } from '@/lib/dateUtils';
 import { PIXELS_PER_DAY } from '@/lib/ganttLayout';
 import dynamic from 'next/dynamic';
@@ -49,6 +50,8 @@ export default function GanttApp() {
     canRedo,
   } = usePersistentGanttState();
   const { t } = useI18n();
+  const activeProjectName =
+    projects.projects.find(p => p.id === projects.activeProjectId)?.name ?? t('about.appName');
   const mermaidRef = useRef<MermaidPanelHandle>(null);
   const prevModeRef = useRef(state.currentMode);
   const [projectListOpen, setProjectListOpen] = useState(false);
@@ -85,15 +88,17 @@ export default function GanttApp() {
     dispatch({ type: 'REPLACE_ALL_TASKS', tasks: defaultTasks });
   }, [dispatch]);
 
-  // When switching from mermaid back to visual, parse the code and replace tasks
+  // When switching from mermaid back to visual, read the text back into the project. Fields
+  // Mermaid cannot express (progress, colours, assignees, …) are kept by task id.
+  const contentRef = useRef({ tasks: state.tasks, milestones: state.milestones });
   useEffect(() => {
-    if (prevModeRef.current === 'mermaid' && state.currentMode === 'visual') {
-      if (mermaidRef.current) {
-        const code = mermaidRef.current.getCode();
-        const newTasks = parseMermaidToTasks(code);
-        if (newTasks.length > 0) {
-          dispatch({ type: 'REPLACE_ALL_TASKS', tasks: newTasks });
-        }
+    contentRef.current = { tasks: state.tasks, milestones: state.milestones };
+  }, [state.tasks, state.milestones]);
+  useEffect(() => {
+    if (prevModeRef.current === 'mermaid' && state.currentMode === 'visual' && mermaidRef.current) {
+      const parsed = parseMermaid(mermaidRef.current.getCode());
+      if (parsed.tasks.length > 0) {
+        dispatch({ type: 'REPLACE_ALL_TASKS', ...applyMermaid(contentRef.current, parsed) });
       }
     }
     prevModeRef.current = state.currentMode;
@@ -262,6 +267,7 @@ export default function GanttApp() {
         <MermaidPanel
           ref={mermaidRef}
           state={state}
+          title={activeProjectName}
         />
       )}
 

@@ -183,7 +183,12 @@ export function ganttReducer(state: GanttState, action: GanttAction): GanttState
     }
 
     case 'REPLACE_ALL_TASKS':
-      return { ...state, tasks: action.tasks, currentFilter: 'ALL' };
+      return {
+        ...state,
+        tasks: action.tasks,
+        milestones: action.milestones ?? state.milestones,
+        currentFilter: 'ALL',
+      };
 
     case 'EXTEND_TIMELINE':
       if (action.direction === 'left') {

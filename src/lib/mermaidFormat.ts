@@ -1,3 +1,5 @@
+import { isHeaderOrComment, sectionName } from './mermaidSyntax';
+
 // Align colons in task lines for readability.
 // Example: "    Task one:crit, t1, 2026-01-01, 5d"
 // becomes: "    Task one        :crit, t1, 2026-01-01, 5d"
@@ -8,10 +10,7 @@ export function formatMermaid(code: string): string {
 
   lines.forEach((line, i) => {
     const trimmed = line.trim();
-    if (trimmed.startsWith('section ') || trimmed === '' || trimmed === 'gantt' ||
-        trimmed.startsWith('title ') || trimmed.startsWith('dateFormat') ||
-        trimmed.startsWith('axisFormat') || trimmed.startsWith('weekday') ||
-        trimmed.startsWith('%%') || !trimmed.includes(':')) {
+    if (trimmed === '' || sectionName(trimmed) !== null || isHeaderOrComment(trimmed) || !trimmed.includes(':')) {
       if (currentGroup.length > 0) {
         sectionGroups.push(currentGroup);
         currentGroup = [];

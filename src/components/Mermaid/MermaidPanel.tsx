@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react';
 import { GanttState } from '@/types';
-import { generateMermaidFromData } from '@/lib/mermaidGenerator';
+import { generateMermaid } from '@/lib/mermaidGenerator';
 import { formatMermaid } from '@/lib/mermaidFormat';
 import { todayISO } from '@/lib/dateUtils';
 import CodeMirror from '@uiw/react-codemirror';
@@ -32,12 +32,18 @@ export interface MermaidPanelHandle {
 
 interface MermaidPanelProps {
   state: GanttState;
+  /** Written as the chart title (the active project's name). */
+  title: string;
 }
 
 const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
-  function MermaidPanel({ state }, ref) {
+  function MermaidPanel({ state, title }, ref) {
     const { t } = useI18n();
-    const [code, setCode] = useState(() => generateMermaidFromData(state.tasks));
+    // The panel mounts when Mermaid mode opens, so the text is generated from the chart once per
+    // visit; edits made here are read back by GanttApp when the user switches to visual mode.
+    const [code, setCode] = useState(() =>
+      generateMermaid({ title, tasks: state.tasks, milestones: state.milestones })
+    );
     const [svgContent, setSvgContent] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [editorWidth, setEditorWidth] = useState(40); // percentage
@@ -54,7 +60,6 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
     const svgContainerRef = useRef<HTMLDivElement>(null);
     const renderIdRef = useRef(0);
     const editorRef = useRef<ReactCodeMirrorRef>(null);
-    const prevModeRef = useRef(state.currentMode);
 
     // Imperative API exposed to parent (GanttApp) so the global Header toolbar
     // can drive editor actions without duplicating state. `apiRef` is mutated
@@ -76,17 +81,6 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
       }),
       []
     );
-
-    // Regenerate code only when mode switches FROM visual TO mermaid.
-    // Staying in mermaid mode must not overwrite user edits even if tasks change.
-    useEffect(() => {
-      if (prevModeRef.current !== 'mermaid' && state.currentMode === 'mermaid') {
-        const newCode = generateMermaidFromData(state.tasks);
-        setCode(newCode);
-        codeRef.current = newCode;
-      }
-      prevModeRef.current = state.currentMode;
-    }, [state.currentMode, state.tasks]);
 
     // Render mermaid diagram
     const renderMermaid = useCallback(async (mermaidCode: string) => {
