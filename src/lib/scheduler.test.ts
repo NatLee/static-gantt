@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { annotateWorkload, buildHierarchy, computeSchedule, endOffsetFor } from './scheduler';
+import { annotateWorkload, buildHierarchy, computeSchedule, endOffsetFor, initialFocusDay } from './scheduler';
 import { defaultTasks } from '@/data/defaultProject';
 import { task } from '@/test/helpers';
 
@@ -164,5 +164,27 @@ describe('buildHierarchy', () => {
     expect(Object.keys(h)).toEqual(['Phase 1', 'Phase 2', 'Other']);
     expect(h['Phase 1']['Planning & Research'].map(t => t.id)).toEqual(['a']);
     expect(h.Other.Marketing.map(t => t.id)).toEqual(['c']);
+  });
+});
+
+describe('initialFocusDay', () => {
+  const tasks = computeSchedule([
+    task('a', { start: '2026-03-01', duration: 10 }),
+    task('b', { after: 'a', duration: 20 }),
+  ]); // days 0..30
+
+  it('opens on today while the project is under way', () => {
+    expect(initialFocusDay(tasks, 12)).toBe(12);
+  });
+
+  // The sample project runs March–June 2026; opened later that year the chart used to centre on
+  // an empty "today" with every task off-screen to the left.
+  it('opens on the first task when the project is over or not started yet', () => {
+    expect(initialFocusDay(tasks, 248)).toBe(0);
+    expect(initialFocusDay(tasks, -40)).toBe(0);
+  });
+
+  it('falls back to today when nothing is scheduled', () => {
+    expect(initialFocusDay([], 7)).toBe(7);
   });
 });
