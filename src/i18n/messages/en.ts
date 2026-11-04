@@ -9,6 +9,10 @@ const en = {
   'common.rename': 'Rename',
   'common.duplicate': 'Duplicate',
   'common.download': 'Download',
+  'a11y.taskBar': '{name}, {start} to {end}, {status}',
+  'a11y.toggleGroup': 'Show or hide {name}',
+  'a11y.renameGroup': 'Rename {name}',
+  'a11y.chart': 'Gantt chart',
 
   // top-level menus
   'menu.file': 'File',
@@ -323,6 +327,11 @@ const en = {
   'shortcuts.insertTask': 'Insert task',
   'shortcuts.insertMilestone': 'Insert milestone',
   'shortcuts.format': 'Format',
+  'shortcuts.taskBar': 'Focused task bar',
+  'shortcuts.barOpen': 'Open the task editor',
+  'shortcuts.barMove': 'Move one day earlier / later',
+  'shortcuts.barResize': 'Shorten / lengthen by one day',
+  'shortcuts.barMenu': 'Open the task menu',
 
   // Welcome dialog
   'welcome.title': 'Welcome 👋',

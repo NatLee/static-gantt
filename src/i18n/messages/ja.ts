@@ -8,6 +8,10 @@ const ja: Record<MessageKey, string> = {
   'common.rename': '名前を変更',
   'common.duplicate': '複製',
   'common.download': 'ダウンロード',
+  'a11y.taskBar': '{name}、{start}〜{end}、{status}',
+  'a11y.toggleGroup': '「{name}」の表示を切り替え',
+  'a11y.renameGroup': '「{name}」の名前を変更',
+  'a11y.chart': 'ガントチャート',
 
   // top-level menus
   'menu.file': 'ファイル',
@@ -322,6 +326,11 @@ const ja: Record<MessageKey, string> = {
   'shortcuts.insertTask': 'タスクを挿入',
   'shortcuts.insertMilestone': 'マイルストーンを挿入',
   'shortcuts.format': '整形',
+  'shortcuts.taskBar': 'フォーカス中のタスクバー',
+  'shortcuts.barOpen': 'タスク編集を開く',
+  'shortcuts.barMove': '1 日前／後へ移動',
+  'shortcuts.barResize': '期間を 1 日短く／長く',
+  'shortcuts.barMenu': 'タスクメニューを開く',
 
   // Welcome dialog
   'welcome.title': 'ようこそ 👋',

@@ -13,6 +13,7 @@ import TaskContextMenu from './TaskContextMenu';
 import PhaseContextMenu from './PhaseContextMenu';
 import AssigneeAvatar from './AssigneeAvatar';
 import { useI18n } from '@/i18n/I18nProvider';
+import { isActivationKey, isContextMenuKey, menuPointFor } from '@/lib/a11y';
 
 interface TaskListColumnProps {
   hierarchy: HierarchyMap;
@@ -156,6 +157,7 @@ export default function TaskListColumn({
       >
         <span
           className="drag-handle"
+          aria-hidden="true"
           onMouseDown={(e) => {
             const source: DragSource = { type: 'phase', masterPhase: master };
             startDrag(e, 'phase', source, e.currentTarget.parentElement!);
@@ -163,12 +165,15 @@ export default function TaskListColumn({
         >
           <GripVertical size={14} />
         </span>
-        <span
+        <button
+          type="button"
           className={`collapse-btn ${isPhaseCollapsed ? 'collapsed' : ''}`}
+          aria-expanded={!isPhaseCollapsed}
+          aria-label={t('a11y.toggleGroup', { name: master })}
           onClick={() => dispatch({ type: 'TOGGLE_PHASE_COLLAPSE', phase: master })}
         >
           <ChevronDown size={14} />
-        </span>
+        </button>
         <span
           style={{
             background: `linear-gradient(135deg, hsl(${phaseHue} 70% 45%), hsl(${phaseHue} 70% 62%))`,
@@ -181,12 +186,24 @@ export default function TaskListColumn({
             marginRight: 8,
             cursor: 'pointer',
           }}
+          role="button"
+          tabIndex={0}
+          aria-label={t('a11y.renameGroup', { name: master })}
           onClick={() =>
             dispatch({
               type: 'OPEN_DIALOG',
               dialog: { type: 'edit-phase', context: { phase: master } },
             })
           }
+          onKeyDown={(e) => {
+            if (isActivationKey(e)) {
+              e.preventDefault();
+              e.currentTarget.click();
+            } else if (isContextMenuKey(e)) {
+              e.preventDefault();
+              setPhaseMenu({ kind: 'phase', masterPhase: master, isCollapsed: isPhaseCollapsed, ...menuPointFor(e.currentTarget) });
+            }
+          }}
         >
           {master}
         </span>
@@ -245,6 +262,7 @@ export default function TaskListColumn({
         >
           <span
             className="drag-handle"
+            aria-hidden="true"
             onMouseDown={(e) => {
               const source: DragSource = { type: 'sub-phase', masterPhase: master, subPhase: sub };
               startDrag(e, 'sub-phase', source, e.currentTarget.parentElement!);
@@ -252,13 +270,16 @@ export default function TaskListColumn({
           >
             <GripVertical size={12} />
           </span>
-          <span
+          <button
+            type="button"
             className={`collapse-btn ${isSubCollapsed ? 'collapsed' : ''}`}
+            aria-expanded={!isSubCollapsed}
+            aria-label={t('a11y.toggleGroup', { name: sub })}
             onClick={() => dispatch({ type: 'TOGGLE_SUB_PHASE_COLLAPSE', key: collapseKey })}
           >
             <ChevronDown size={12} />
-          </span>
-          <FolderOpen size={14} style={{ marginRight: 6, color: 'var(--text-secondary)' }} />
+          </button>
+          <FolderOpen size={14} aria-hidden="true" style={{ marginRight: 6, color: 'var(--text-secondary)' }} />
           <span
             style={{
               fontSize: 12,
@@ -270,12 +291,24 @@ export default function TaskListColumn({
               whiteSpace: 'nowrap',
             }}
             className="task-name-text"
+            role="button"
+            tabIndex={0}
+            aria-label={t('a11y.renameGroup', { name: sub })}
             onClick={() =>
               dispatch({
                 type: 'OPEN_DIALOG',
                 dialog: { type: 'edit-sub-phase', context: { masterPhase: master, subPhase: sub } },
               })
             }
+            onKeyDown={(e) => {
+              if (isActivationKey(e)) {
+                e.preventDefault();
+                e.currentTarget.click();
+              } else if (isContextMenuKey(e)) {
+                e.preventDefault();
+                setPhaseMenu({ kind: 'sub-phase', masterPhase: master, subPhase: sub, isCollapsed: isSubCollapsed, ...menuPointFor(e.currentTarget) });
+              }
+            }}
           >
             {sub}
           </span>
@@ -318,10 +351,23 @@ export default function TaskListColumn({
             onMouseLeave={() => {
               if (!isTaskBeingDragged) setHover(null);
             }}
+            role="button"
+            tabIndex={0}
+            aria-label={task.name}
             onClick={() => {
               if (isDragging) return;
               dispatch({ type: 'SET_SELECTED_TASK', taskId: task.id });
               dispatch({ type: 'OPEN_TASK_EDITOR', taskId: task.id });
+            }}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (isActivationKey(e)) {
+                e.preventDefault();
+                e.currentTarget.click();
+              } else if (isContextMenuKey(e)) {
+                e.preventDefault();
+                setContextMenu({ task, ...menuPointFor(e.currentTarget) });
+              }
             }}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -330,6 +376,7 @@ export default function TaskListColumn({
           >
             <span
               className="drag-handle"
+              aria-hidden="true"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 const source: DragSource = {

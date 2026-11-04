@@ -1,6 +1,7 @@
 'use client';
 
-import { Dispatch, useEffect, useState, useRef, useCallback } from 'react';
+import { Dispatch, KeyboardEvent, useState, useCallback, useId } from 'react';
+import Dialog from './Dialog';
 import { GanttState, GanttAction, Task } from '@/types';
 import { genId, todayISO } from '@/lib/dateUtils';
 import { MS_COLORS } from '@/data/defaultProject';
@@ -41,13 +42,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
     dialog?.type === 'edit-milestone' ? dialog.context.date || editedMilestone?.date || '' : ''
   );
 
-  const firstInputRef = useRef<HTMLInputElement>(null);
-
-  // Focus the first field once the dialog has rendered.
-  useEffect(() => {
-    const timer = setTimeout(() => firstInputRef.current?.focus(), 50);
-    return () => clearTimeout(timer);
-  }, []);
+  const titleId = useId();
 
   const handleClose = useCallback(() => {
     dispatch({ type: 'CLOSE_DIALOG' });
@@ -252,20 +247,13 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
     dispatch({ type: 'CLOSE_DIALOG' });
   }, [dialog, dispatch]);
 
-  // Enter key submits
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        const active = document.activeElement;
-        if (active && active.tagName === 'BUTTON') return;
-        handleSubmit();
-      } else if (e.key === 'Escape') {
-        handleClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSubmit, handleClose]);
+  // Enter submits from any field (buttons keep their own Enter).
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+    e.preventDefault();
+    handleSubmit();
+  };
 
   if (!dialog) return null;
 
@@ -274,21 +262,17 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
   const showDeleteButton = dialog.type === 'edit-phase' || dialog.type === 'edit-sub-phase' || dialog.type === 'edit-milestone';
 
   return (
-    <>
-      {/* Overlay */}
-      <div className="add-dialog-overlay" onClick={handleClose} />
-
-      {/* Dialog */}
-      <div className="add-dialog">
+    <Dialog labelledBy={titleId} onClose={handleClose} onKeyDown={handleKeyDown}>
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm"
             style={{ background: dialogConfig.iconBg }}
+            aria-hidden="true"
           >
             {dialogConfig.icon}
           </div>
-          <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+          <h3 id={titleId} className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
             {dialogConfig.title}
           </h3>
         </div>
@@ -329,8 +313,7 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
             </button>
           </div>
         </div>
-      </div>
-    </>
+    </Dialog>
   );
 
   function renderFields(type: string) {
@@ -340,7 +323,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           <>
             <FieldGroup label={t('field.phaseName')}>
               <input
-                ref={firstInputRef}
                 type="text"
                 className="input-field"
                 placeholder={t('ph.phase')}
@@ -383,7 +365,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           <>
             <FieldGroup label={t('field.subPhaseName')}>
               <input
-                ref={firstInputRef}
                 type="text"
                 className="input-field"
                 placeholder={t('ph.testing')}
@@ -419,7 +400,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           <>
             <FieldGroup label={t('field.taskName')}>
               <input
-                ref={firstInputRef}
                 type="text"
                 className="input-field"
                 placeholder={t('ph.implement')}
@@ -443,7 +423,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         return (
           <FieldGroup label={t('field.phaseName')}>
             <input
-              ref={firstInputRef}
               type="text"
               className="input-field"
               value={phaseName}
@@ -456,7 +435,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
         return (
           <FieldGroup label={t('field.subPhaseName')}>
             <input
-              ref={firstInputRef}
               type="text"
               className="input-field"
               value={subPhaseName}
@@ -470,7 +448,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           <>
             <FieldGroup label={t('field.milestoneName')}>
               <input
-                ref={firstInputRef}
                 type="text"
                 className="input-field"
                 placeholder={t('ph.betaRelease')}
@@ -494,7 +471,6 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
           <>
             <FieldGroup label={t('field.milestoneName')}>
               <input
-                ref={firstInputRef}
                 type="text"
                 className="input-field"
                 value={milestoneName}
@@ -518,14 +494,15 @@ export default function AddDialog({ state, dispatch }: AddDialogProps) {
   }
 }
 
+/** A field with its caption. The <label> wraps the control, so the caption is its accessible name. */
 function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
         {label}
-      </label>
+      </span>
       {children}
-    </div>
+    </label>
   );
 }
 

@@ -8,6 +8,10 @@ const zhCN: Record<MessageKey, string> = {
   'common.rename': '重命名',
   'common.duplicate': '复制',
   'common.download': '下载',
+  'a11y.taskBar': '{name}，{start} 至 {end}，{status}',
+  'a11y.toggleGroup': '展开或收起“{name}”',
+  'a11y.renameGroup': '重命名“{name}”',
+  'a11y.chart': '甘特图',
 
   // top-level menus
   'menu.file': '文件',
@@ -322,6 +326,11 @@ const zhCN: Record<MessageKey, string> = {
   'shortcuts.insertTask': '插入任务',
   'shortcuts.insertMilestone': '插入里程碑',
   'shortcuts.format': '格式化',
+  'shortcuts.taskBar': '选中的任务条',
+  'shortcuts.barOpen': '打开任务编辑',
+  'shortcuts.barMove': '提前／推迟一天',
+  'shortcuts.barResize': '工期减少／增加一天',
+  'shortcuts.barMenu': '打开任务菜单',
 
   // Welcome dialog
   'welcome.title': '欢迎 👋',

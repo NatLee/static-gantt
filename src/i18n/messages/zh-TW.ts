@@ -8,6 +8,10 @@ const zhTW: Record<MessageKey, string> = {
   'common.rename': '重新命名',
   'common.duplicate': '複製',
   'common.download': '下載',
+  'a11y.taskBar': '{name}，{start} 到 {end}，{status}',
+  'a11y.toggleGroup': '展開或收合「{name}」',
+  'a11y.renameGroup': '重新命名「{name}」',
+  'a11y.chart': '甘特圖',
 
   // top-level menus
   'menu.file': '檔案',
@@ -322,6 +326,11 @@ const zhTW: Record<MessageKey, string> = {
   'shortcuts.insertTask': '插入任務',
   'shortcuts.insertMilestone': '插入里程碑',
   'shortcuts.format': '格式化',
+  'shortcuts.taskBar': '選取的任務條',
+  'shortcuts.barOpen': '打開任務編輯',
+  'shortcuts.barMove': '提早／延後一天',
+  'shortcuts.barResize': '工期減少／增加一天',
+  'shortcuts.barMenu': '打開任務選單',
 
   // Welcome dialog
   'welcome.title': '歡迎 👋',

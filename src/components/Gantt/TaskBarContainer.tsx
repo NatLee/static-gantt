@@ -2,7 +2,9 @@
 
 import React, { useRef, useCallback, useState } from 'react';
 import { ComputedTask, GanttState, GanttAction, HierarchyMap } from '@/types';
-import { offsetToDate, offsetToISO, formatDate } from '@/lib/dateUtils';
+import { offsetToDate, offsetToISO, formatDate, formatDateFull } from '@/lib/dateUtils';
+import { isActivationKey, isContextMenuKey, menuPointFor } from '@/lib/a11y';
+import { STATUS_LABEL_KEYS } from '@/i18n/messages';
 import { endOffsetFor } from '@/lib/scheduler';
 import { PIXELS_PER_DAY, ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
@@ -399,6 +401,31 @@ export default function TaskBarContainer({
     [ppd, dispatch, hierarchy, state.currentFilter, state.collapsedPhases, state.collapsedSubPhases, state.workingDaysOnly, scrollContainerRef]
   );
 
+  /**
+   * Keyboard equivalent of clicking and dragging a focused bar: Enter/Space opens the editor,
+   * ←/→ moves it a day (pinning its start, as dragging does), Shift+←/→ changes its length, and
+   * the menu key or Shift+F10 opens the task menu.
+   */
+  const handleBarKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, task: ComputedTask) => {
+    if (isActivationKey(e)) {
+      e.preventDefault();
+      dispatch({ type: 'SET_SELECTED_TASK', taskId: task.id });
+      dispatch({ type: 'OPEN_TASK_EDITOR', taskId: task.id });
+    } else if (isContextMenuKey(e)) {
+      e.preventDefault();
+      setContextMenu({ task, ...menuPointFor(e.currentTarget) });
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      const step = e.key === 'ArrowLeft' ? -1 : 1;
+      if (e.shiftKey) {
+        const newDuration = Math.max(1, task.duration + step);
+        if (newDuration !== task.duration) dispatch({ type: 'RESIZE_TASK', taskId: task.id, newDuration });
+      } else {
+        dispatch({ type: 'MOVE_TASK', taskId: task.id, newStartDate: offsetToISO(task.startDayOffset + step) });
+      }
+    }
+  };
+
   const visibleTasks = computed.filter((t) => {
     if (t.rowIndex === undefined || Number.isNaN(t.startDayOffset)) return false;
     if (!virtualWindow.enabled) return true;
@@ -479,6 +506,7 @@ export default function TaskBarContainer({
               {/* Left cluster: outer = add-with-dep (before), inner = plain add */}
               <div
                 className="bar-add-btn left dep"
+                aria-hidden="true"
                 title={t('bar.addLinkedPred')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => handleConnectMouseDown(e, task, 'backward')}
@@ -490,6 +518,7 @@ export default function TaskBarContainer({
               </div>
               <div
                 className="bar-add-btn left plain"
+                aria-hidden="true"
                 title={t('bar.addAdjacent')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => {
@@ -513,6 +542,15 @@ export default function TaskBarContainer({
                   barRefs.current[task.id] = el;
                 }}
                 data-task-id={task.id}
+                role="button"
+                tabIndex={0}
+                aria-label={t('a11y.taskBar', {
+                  name: task.name,
+                  start: formatDateFull(offsetToDate(task.startDayOffset)),
+                  end: formatDateFull(endDate),
+                  status: t(STATUS_LABEL_KEYS[task.status]),
+                })}
+                onKeyDown={(e) => handleBarKeyDown(e, task)}
                 className={`task-bar ${task.color ? '' : statusClass(task.status)} ${
                   effCritical ? 'ring-2 ring-red-400' : ''
                 } ${isDropTarget ? (connectCycleBlocked ? 'drop-target-blocked' : 'drop-target') : ''} ${
@@ -651,6 +689,7 @@ export default function TaskBarContainer({
               {/* Right cluster: inner = plain add, outer = add-with-dep (after) */}
               <div
                 className="bar-add-btn right plain"
+                aria-hidden="true"
                 title={t('bar.addAdjacent')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => {
@@ -669,6 +708,7 @@ export default function TaskBarContainer({
               </div>
               <div
                 className="bar-add-btn right dep"
+                aria-hidden="true"
                 title={t('bar.addLinkedSucc')}
                 style={{ pointerEvents: 'auto' }}
                 onMouseDown={(e) => handleConnectMouseDown(e, task, 'forward')}

@@ -1,21 +1,12 @@
 'use client';
 
-import { Dispatch, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import {
-  Check,
-  Copy,
-  Edit,
-  Flag,
-  Hash,
-  Plus,
-  Trash2,
-  Zap,
-} from 'lucide-react';
+import { Dispatch } from 'react';
+import { Check, Copy, Edit, Flag, Hash, Plus, Trash2, Zap } from 'lucide-react';
 import { GanttAction, Task, TaskStatus } from '@/types';
 import { genId } from '@/lib/dateUtils';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
+import ContextMenu, { ContextMenuDivider, ContextMenuHeading, ContextMenuItem } from './ContextMenu';
 
 interface Props {
   task: Task;
@@ -33,39 +24,6 @@ const STATUS_OPTIONS: Array<{ value: TaskStatus; labelKey: MessageKey }> = [
 
 export default function TaskContextMenu({ task, x, y, dispatch, onClose }: Props) {
   const { t } = useI18n();
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ left: x, top: y, measured: false });
-
-  useLayoutEffect(() => {
-    const el = menuRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let left = x;
-    let top = y;
-    if (left + rect.width > vw - 8) left = Math.max(8, vw - rect.width - 8);
-    if (top + rect.height > vh - 8) top = Math.max(8, vh - rect.height - 8);
-    setPosition({ left, top, measured: true });
-  }, [x, y]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    const onClick = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('mousedown', onClick);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('mousedown', onClick);
-    };
-  }, [onClose]);
 
   const run = (fn: () => void) => {
     fn();
@@ -97,40 +55,27 @@ export default function TaskContextMenu({ task, x, y, dispatch, onClose }: Props
   const handleSetStatus = (status: TaskStatus) =>
     run(() => dispatch({ type: 'UPDATE_TASK', taskId: task.id, updates: { status } }));
 
-  if (typeof document === 'undefined') return null;
-  return createPortal(
-    <div
-      ref={menuRef}
-      className="fixed min-w-[200px] rounded-lg shadow-2xl py-1"
-      style={{
-        left: position.left,
-        top: position.top,
-        zIndex: 1000,
-        background: 'var(--bg-panel)',
-        border: '1px solid var(--border-color)',
-        backdropFilter: 'blur(16px)',
-        visibility: position.measured ? 'visible' : 'hidden',
-      }}
-      onContextMenu={e => e.preventDefault()}
-    >
-      <MenuLabel>{task.name}</MenuLabel>
-      <Divider />
-      <Item icon={<Edit className="w-3 h-3" />} label={t('ctx.edit')} onClick={handleEdit} />
-      <Item icon={<Copy className="w-3 h-3" />} label={t('ctx.duplicate')} onClick={handleDuplicate} />
-      <Item icon={<Hash className="w-3 h-3" />} label={t('ctx.copyId', { id: task.id })} onClick={handleCopyId} />
-      <Divider />
-      <Item icon={<Plus className="w-3 h-3" />} label={t('ctx.addBefore')} onClick={handleAddBefore} />
-      <Item icon={<Plus className="w-3 h-3" />} label={t('ctx.addAfter')} onClick={handleAddAfter} />
-      <Divider />
-      <Item
+  return (
+    <ContextMenu x={x} y={y} label={task.name} onClose={onClose}>
+      <ContextMenuHeading>{task.name}</ContextMenuHeading>
+      <ContextMenuDivider />
+      <ContextMenuItem icon={<Edit className="w-3 h-3" />} label={t('ctx.edit')} onClick={handleEdit} />
+      <ContextMenuItem icon={<Copy className="w-3 h-3" />} label={t('ctx.duplicate')} onClick={handleDuplicate} />
+      <ContextMenuItem icon={<Hash className="w-3 h-3" />} label={t('ctx.copyId', { id: task.id })} onClick={handleCopyId} />
+      <ContextMenuDivider />
+      <ContextMenuItem icon={<Plus className="w-3 h-3" />} label={t('ctx.addBefore')} onClick={handleAddBefore} />
+      <ContextMenuItem icon={<Plus className="w-3 h-3" />} label={t('ctx.addAfter')} onClick={handleAddAfter} />
+      <ContextMenuDivider />
+      <ContextMenuItem
         icon={<Zap className="w-3 h-3" style={{ color: task.isCritical ? '#ef4444' : undefined }} />}
         label={task.isCritical ? t('ctx.unmarkCritical') : t('ctx.markCritical')}
         onClick={handleToggleCritical}
       />
-      <SubLabel>{t('ctx.status')}</SubLabel>
+      <ContextMenuHeading small>{t('ctx.status')}</ContextMenuHeading>
       {STATUS_OPTIONS.map(opt => (
-        <Item
+        <ContextMenuItem
           key={opt.value}
+          checked={task.status === opt.value}
           icon={
             task.status === opt.value ? (
               <Check className="w-3 h-3 text-emerald-500" />
@@ -142,69 +87,8 @@ export default function TaskContextMenu({ task, x, y, dispatch, onClose }: Props
           onClick={() => handleSetStatus(opt.value)}
         />
       ))}
-      <Divider />
-      <Item
-        icon={<Trash2 className="w-3 h-3" />}
-        label={t('ctx.delete')}
-        onClick={handleDelete}
-        danger
-      />
-    </div>,
-    document.body
-  );
-}
-
-function Item({
-  icon,
-  label,
-  onClick,
-  danger,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-medium cursor-pointer transition-colors hover:bg-[var(--bg-card)]"
-      style={{ color: danger ? '#ef4444' : 'var(--text-primary)' }}
-      onClick={onClick}
-      type="button"
-    >
-      <span className="opacity-70 shrink-0">{icon}</span>
-      <span className="truncate">{label}</span>
-    </button>
-  );
-}
-
-function Divider() {
-  return (
-    <div
-      className="my-1 mx-2"
-      style={{ height: 1, background: 'var(--border-color)', opacity: 0.6 }}
-    />
-  );
-}
-
-function MenuLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider truncate"
-      style={{ color: 'var(--text-secondary)' }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function SubLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="px-3 pt-1.5 pb-0.5 text-[9px] font-bold uppercase tracking-wider"
-      style={{ color: 'var(--text-secondary)' }}
-    >
-      {children}
-    </div>
+      <ContextMenuDivider />
+      <ContextMenuItem icon={<Trash2 className="w-3 h-3" />} label={t('ctx.delete')} onClick={handleDelete} danger />
+    </ContextMenu>
   );
 }
