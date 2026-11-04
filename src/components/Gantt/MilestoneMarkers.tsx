@@ -5,6 +5,7 @@ import { Diamond } from 'lucide-react';
 import { Milestone, GanttAction } from '@/types';
 import { formatDateFull, dateToOffset, offsetToDate, todayOffset } from '@/lib/dateUtils';
 import { PIXELS_PER_DAY, Z } from '@/lib/ganttLayout';
+import { isActivationKey } from '@/lib/a11y';
 import { useI18n } from '@/i18n/I18nProvider';
 
 
@@ -90,12 +91,21 @@ export default function MilestoneMarkers({
             {/* Floating label */}
             <div
               className={`milestone-label clickable ${ms.colorClass}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`${ms.name}, ${formatDateFull(offsetToDate(msOffset))}`}
               onClick={() =>
                 dispatch({
                   type: 'OPEN_DIALOG',
                   dialog: { type: 'edit-milestone', context: { milestoneId: ms.id } },
                 })
               }
+              onKeyDown={(e) => {
+                if (isActivationKey(e)) {
+                  e.preventDefault();
+                  e.currentTarget.click();
+                }
+              }}
               style={{
                 position: 'absolute',
                 top: 4,

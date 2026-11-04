@@ -10,6 +10,7 @@ import {
 import { defaultTasks, defaultMilestones } from '@/data/defaultProject';
 import { computeSchedule, computeTimelineBounds } from '@/lib/scheduler';
 import { todayISO } from '@/lib/dateUtils';
+import { DEFAULT_ZOOM } from '@/lib/ganttLayout';
 import { OTHER_PHASE } from '@/lib/phase';
 import { downloadBlob, safeFileName } from '@/lib/download';
 
@@ -71,7 +72,7 @@ export function buildDefaultProject(name = 'Default Project'): ProjectFile {
       tasks: defaultTasks,
       milestones: defaultMilestones,
       currentFilter: 'ALL',
-      zoomScale: 1,
+      zoomScale: DEFAULT_ZOOM,
       collapsedPhases: [],
       collapsedSubPhases: [],
       timelineStartDay: bounds.startDay,
@@ -93,7 +94,7 @@ export function buildEmptyProject(name = 'Untitled Project'): ProjectFile {
       tasks: [],
       milestones: [],
       currentFilter: 'ALL',
-      zoomScale: 1,
+      zoomScale: DEFAULT_ZOOM,
       collapsedPhases: [],
       collapsedSubPhases: [],
       timelineStartDay: 0,

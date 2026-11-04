@@ -18,17 +18,11 @@ import SearchPanel from '@/components/Gantt/SearchPanel';
 import { parseMermaid } from '@/lib/mermaidParser';
 import { applyMermaid } from '@/lib/mermaidSync';
 import { todayOffset } from '@/lib/dateUtils';
-import { PIXELS_PER_DAY } from '@/lib/ganttLayout';
+import { PIXELS_PER_DAY, ZOOM_PRESETS, type ZoomPreset } from '@/lib/ganttLayout';
 import dynamic from 'next/dynamic';
 import type { MermaidPanelHandle } from '@/components/Mermaid/MermaidPanel';
 import { useI18n } from '@/i18n/I18nProvider';
 
-const ZOOM_PRESETS = {
-  day: 4,     // ppd 20
-  week: 2,    // ppd 10
-  month: 0.8, // ppd 4
-} as const;
-export type ZoomPreset = keyof typeof ZOOM_PRESETS;
 
 const MermaidPanel = dynamic(() => import('@/components/Mermaid/MermaidPanel'), {
   ssr: false,
@@ -165,7 +159,7 @@ export default function GanttApp() {
     const available = container.clientWidth - sidebarPx - 24;
     if (available <= 0) return;
     const ppd = available / totalDays;
-    const scale = Math.max(0.2, Math.min(5, ppd / PIXELS_PER_DAY));
+    const scale = ppd / PIXELS_PER_DAY; // the reducer keeps it within MIN_ZOOM..MAX_ZOOM
     dispatch({ type: 'SET_ZOOM', scale });
   }, [dispatch, state.timelineStartDay, state.timelineEndDay]);
 

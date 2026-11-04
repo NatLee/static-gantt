@@ -5,6 +5,7 @@ import { computeSchedule, buildHierarchy, computeTimelineBounds, annotateWorkloa
 import { rewireDependencies } from '@/lib/dependencyRewire';
 import { joinPhase, masterOf, splitPhase } from '@/lib/phase';
 import { formatAfter, parseAfter } from '@/lib/dependencies';
+import { DEFAULT_ZOOM, MAX_ZOOM, MIN_ZOOM } from '@/lib/ganttLayout';
 import { undoable, useUndoableReducer } from './useUndoableReducer';
 
 const initialBounds = computeTimelineBounds(computeSchedule(defaultTasks), defaultMilestones);
@@ -15,7 +16,7 @@ const initialState: GanttState = {
   currentFilter: 'ALL',
   currentMode: 'visual',
   isDark: true,
-  zoomScale: 1,
+  zoomScale: DEFAULT_ZOOM,
   collapsedPhases: new Set<string>(),
   collapsedSubPhases: new Set<string>(),
   editingTaskId: null,
@@ -59,7 +60,7 @@ export function ganttReducer(state: GanttState, action: GanttAction): GanttState
       return { ...state, isDark: !state.isDark };
 
     case 'SET_ZOOM':
-      return { ...state, zoomScale: Math.max(0.2, Math.min(action.scale, 5)) };
+      return { ...state, zoomScale: Math.max(MIN_ZOOM, Math.min(action.scale, MAX_ZOOM)) };
 
     case 'TOGGLE_PHASE_COLLAPSE': {
       const next = new Set(state.collapsedPhases);

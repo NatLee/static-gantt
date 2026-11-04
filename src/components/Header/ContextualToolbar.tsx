@@ -4,7 +4,7 @@ import { Dispatch } from 'react';
 import VisualContextualToolbar from './VisualContextualToolbar';
 import MermaidContextualToolbar from './MermaidContextualToolbar';
 import type { GanttAction, GanttState } from '@/types';
-import type { ZoomPreset } from '@/components/GanttApp';
+import type { ZoomPreset } from '@/lib/ganttLayout';
 
 interface Props {
   state: GanttState;

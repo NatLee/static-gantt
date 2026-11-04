@@ -789,3 +789,8 @@ select.custom-select {
 .task-bar:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
 .task-row:focus-visible { outline-offset: -2px; }
 button.collapse-btn { background: transparent; border: 0; padding: 0; color: inherit; font: inherit; }
+
+/* Milestone colours are stored with each milestone as pale text classes made for the dark theme
+   (text-*-300). On the light background that text was unreadable, so it takes the theme's text
+   colour; the tinted fill, border and line keep the milestone's colour. */
+[data-theme="light"] .milestone-label { color: var(--text-primary); }

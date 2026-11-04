@@ -5,7 +5,7 @@ import Menubar from './Menubar';
 import ContextualToolbar from './ContextualToolbar';
 import type { GanttAction, GanttState, ComputedTask } from '@/types';
 import type { ProjectsAPI, SaveStatus } from '@/hooks/usePersistentGanttState';
-import type { ZoomPreset } from '@/components/GanttApp';
+import type { ZoomPreset } from '@/lib/ganttLayout';
 
 interface HeaderProps {
   state: GanttState;
