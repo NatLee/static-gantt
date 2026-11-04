@@ -43,6 +43,7 @@ export default function GanttApp() {
     taskMap,
     masterPhases,
     projects,
+    hydrated,
     saveStatus,
     undo,
     redo,
@@ -249,7 +250,13 @@ export default function GanttApp() {
         onMermaidExportPNG={mermaidExportPNG}
       />
 
-      {state.currentMode === 'visual' ? (
+      {/* The chart depends on today's date and on the project saved in this browser, neither of
+          which exists when the static page is built. Render it only after loading, so the
+          prebuilt HTML and the first client render agree (no hydration mismatch) and the sample
+          project never flashes up before the user's own one. */}
+      {!hydrated ? (
+        <main className="flex-1" aria-busy="true" />
+      ) : state.currentMode === 'visual' ? (
         state.tasks.length === 0 ? (
           <EmptyState dispatch={dispatch} onLoadDefault={handleLoadSample} />
         ) : (

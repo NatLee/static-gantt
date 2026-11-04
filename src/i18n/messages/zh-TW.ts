@@ -27,6 +27,10 @@ const zhTW: Record<MessageKey, string> = {
   'file.downloadBackup': '下載備份（全部）',
   'file.importJson': '匯入 JSON…',
   'file.importFailed': '匯入失敗',
+  'import.notJson': '這個檔案不是有效的 JSON。',
+  'import.unknownFormat': '這個 JSON 不是本工具的專案檔或備份檔。',
+  'import.noProjects': '備份檔裡沒有任何專案，所以沒有匯入。',
+  'import.invalidProject': '專案「{name}」的任務資料缺漏或損壞，所以沒有匯入。',
 
   // Edit menu
   'edit.undo': '復原',
@@ -156,6 +160,7 @@ const zhTW: Record<MessageKey, string> = {
   'switcher.manage': '管理專案…',
   'switcher.saving': '儲存中…',
   'switcher.saved': '已儲存',
+  'switcher.saveFailed': '沒有儲存：瀏覽器拒絕儲存這個專案（空間可能已滿）。請先下載備份，以免資料遺失。',
 
   // Add/Edit dialog
   'dialog.addPhase.title': '新增階段',

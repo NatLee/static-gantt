@@ -27,6 +27,10 @@ const ja: Record<MessageKey, string> = {
   'file.downloadBackup': 'バックアップをダウンロード（全件）',
   'file.importJson': 'JSON をインポート…',
   'file.importFailed': 'インポートに失敗しました',
+  'import.notJson': 'このファイルは有効な JSON ではありません。',
+  'import.unknownFormat': 'この JSON は、このアプリのプロジェクトファイルでもバックアップでもありません。',
+  'import.noProjects': 'バックアップにプロジェクトが含まれていないため、何もインポートしませんでした。',
+  'import.invalidProject': 'プロジェクト「{name}」のタスクが欠けているか壊れているため、何もインポートしませんでした。',
 
   // Edit menu
   'edit.undo': '元に戻す',
@@ -156,6 +160,7 @@ const ja: Record<MessageKey, string> = {
   'switcher.manage': 'プロジェクトを管理…',
   'switcher.saving': '保存中…',
   'switcher.saved': '保存しました',
+  'switcher.saveFailed': '保存できません：ブラウザーがこのプロジェクトの保存を拒否しました（容量不足の可能性があります）。作業を失わないよう、バックアップをダウンロードしてください。',
 
   // Add/Edit dialog
   'dialog.addPhase.title': 'フェーズを追加',

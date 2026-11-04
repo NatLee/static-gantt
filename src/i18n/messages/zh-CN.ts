@@ -27,6 +27,10 @@ const zhCN: Record<MessageKey, string> = {
   'file.downloadBackup': '下载备份（全部）',
   'file.importJson': '导入 JSON…',
   'file.importFailed': '导入失败',
+  'import.notJson': '此文件不是有效的 JSON。',
+  'import.unknownFormat': '此 JSON 不是本工具的项目文件或备份文件。',
+  'import.noProjects': '备份文件中没有任何项目，因此没有导入。',
+  'import.invalidProject': '项目“{name}”的任务数据缺失或损坏，因此没有导入。',
 
   // Edit menu
   'edit.undo': '撤销',
@@ -156,6 +160,7 @@ const zhCN: Record<MessageKey, string> = {
   'switcher.manage': '管理项目…',
   'switcher.saving': '保存中…',
   'switcher.saved': '已保存',
+  'switcher.saveFailed': '未保存：浏览器拒绝存储这个项目（空间可能已满）。请先下载备份，以免数据丢失。',
 
   // Add/Edit dialog
   'dialog.addPhase.title': '添加阶段',

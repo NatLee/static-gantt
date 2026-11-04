@@ -28,6 +28,10 @@ const en = {
   'file.downloadBackup': 'Download backup (all)',
   'file.importJson': 'Import JSON…',
   'file.importFailed': 'Import failed',
+  'import.notJson': 'This file is not valid JSON.',
+  'import.unknownFormat': 'This JSON is not a project file or a backup from this app.',
+  'import.noProjects': 'The backup contains no projects, so nothing was imported.',
+  'import.invalidProject': 'Project "{name}" has missing or broken tasks, so nothing was imported.',
 
   // Edit menu
   'edit.undo': 'Undo',
@@ -157,6 +161,7 @@ const en = {
   'switcher.manage': 'Manage projects…',
   'switcher.saving': 'Saving…',
   'switcher.saved': 'Saved',
+  'switcher.saveFailed': 'Not saved: the browser refused to store this project (its storage may be full). Download a backup to keep your work.',
 
   // Add/Edit dialog
   'dialog.addPhase.title': 'Add New Phase',

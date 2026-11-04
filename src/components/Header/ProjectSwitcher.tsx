@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Check, FolderOpen, Edit3 } from 'lucide-react';
 import type { ProjectsAPI, SaveStatus } from '@/hooks/usePersistentGanttState';
 import { useI18n } from '@/i18n/I18nProvider';
+import type { MessageKey } from '@/i18n/messages';
 
 interface ProjectSwitcherProps {
   api: ProjectsAPI;
@@ -158,18 +159,25 @@ export default function ProjectSwitcher({ api, saveStatus, onOpenProjectList }: 
   );
 }
 
+const SAVE_DOT: Record<Exclude<SaveStatus, 'idle'>, { label: MessageKey; color: string; pulse?: boolean }> = {
+  saving: { label: 'switcher.saving', color: 'var(--text-secondary)', pulse: true },
+  saved: { label: 'switcher.saved', color: '#10b981' },
+  error: { label: 'switcher.saveFailed', color: '#ef4444', pulse: true },
+};
+
 function SaveDot({ status }: { status: SaveStatus }) {
   const { t } = useI18n();
   if (status === 'idle') return null;
-  const saving = status === 'saving';
+  const { label, color, pulse } = SAVE_DOT[status];
   return (
     <span
       className="save-dot"
-      title={saving ? t('switcher.saving') : t('switcher.saved')}
-      aria-label={saving ? t('switcher.saving') : t('switcher.saved')}
+      role={status === 'error' ? 'alert' : 'status'}
+      title={t(label)}
+      aria-label={t(label)}
       style={{
-        background: saving ? 'var(--text-secondary)' : '#10b981',
-        animation: saving ? 'save-pulse 1s ease-in-out infinite' : undefined,
+        background: color,
+        animation: pulse ? 'save-pulse 1s ease-in-out infinite' : undefined,
       }}
     />
   );

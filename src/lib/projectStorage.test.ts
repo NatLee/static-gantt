@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  ImportError,
   STORAGE_KEY,
   findActiveProject,
   loadAppStorage,
+  normalizeProjectState,
   parseImport,
   saveAppStorage,
   serializeState,
 } from './projectStorage';
+import { safeFileName } from './download';
 import { ganttReducer } from '@/hooks/useGanttState';
 import type { AppStorage, GanttState } from '@/types';
 import savedV1 from '@/test/fixtures/app-storage-v1.json';
@@ -85,8 +88,51 @@ describe('loadAppStorage', () => {
   });
 
   it('round-trips through saveAppStorage', () => {
-    saveAppStorage(savedV1 as AppStorage);
+    expect(saveAppStorage(savedV1 as AppStorage)).toBe(true);
     expect(loadAppStorage()).toEqual(savedV1);
+  });
+
+  it('reports a refused write instead of only logging it', () => {
+    // Quota exceeded, Safari private mode, …: the UI now shows "not saved" for this.
+    storage.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); };
+    const quiet = console.error;
+    console.error = () => {};
+    try {
+      expect(saveAppStorage(savedV1 as AppStorage)).toBe(false);
+    } finally {
+      console.error = quiet;
+    }
+  });
+
+  it('skips a stored project whose tasks are unusable and keeps the rest', () => {
+    const broken = { ...savedV1, projects: [{ ...savedV1.projects[0], state: { tasks: 'oops' } }, savedV1.projects[1]] };
+    storage.setItem(STORAGE_KEY, JSON.stringify(broken));
+    const loaded = loadAppStorage();
+    expect(loaded.projects.map(p => p.id)).toEqual(['p0older']);
+    expect(loaded.activeProjectId).toBe('p0older');
+  });
+});
+
+describe('normalizeProjectState', () => {
+  it('returns valid saved state unchanged', () => {
+    for (const p of (savedV1 as AppStorage).projects) {
+      expect(normalizeProjectState(p.state)).toEqual(p.state);
+    }
+  });
+
+  it('fills in what a hand-made file leaves out', () => {
+    const state = normalizeProjectState({ tasks: [{ id: 'a', name: 'A', start: '2026-03-02', duration: null }] })!;
+    expect(state.tasks).toEqual([{ id: 'a', name: 'A', start: '2026-03-02', duration: 1, phase: 'Other', status: 'planned', isCritical: false }]);
+    expect(state.milestones).toEqual([]);
+    expect(state.currentFilter).toBe('ALL');
+    expect(state.zoomScale).toBe(1);
+    expect(Number.isFinite(state.timelineStartDay) && Number.isFinite(state.timelineEndDay)).toBe(true);
+  });
+
+  it('rejects tasks without an id and malformed milestones', () => {
+    expect(normalizeProjectState({ tasks: [{ name: 'no id' }] })).toBeNull();
+    expect(normalizeProjectState({ tasks: [], milestones: [{ id: 1 }] })).toBeNull();
+    expect(normalizeProjectState({ tasks: {} })).toBeNull();
   });
 });
 
@@ -101,6 +147,36 @@ describe('parseImport', () => {
   });
 
   it('rejects unrelated JSON', () => {
-    expect(() => parseImport('{"hello":"world"}')).toThrow();
+    expect(() => parseImport('{"hello":"world"}')).toThrow(ImportError);
+  });
+
+  // Each rejection carries a code the UI translates; before, users saw raw parser messages such
+  // as "Unexpected token" and an empty backup crashed the page after replacing all projects.
+  const codeOf = (text: string) => {
+    try { parseImport(text); } catch (e) { return e instanceof ImportError ? [e.code, e.projectName] : ['other']; }
+    return ['accepted'];
+  };
+
+  it('explains why a file was rejected', () => {
+    expect(codeOf('not json')).toEqual(['not-json', undefined]);
+    expect(codeOf('{"hello":"world"}')).toEqual(['unknown-format', undefined]);
+    expect(codeOf(JSON.stringify({ ...savedV1, projects: [] }))).toEqual(['no-projects', undefined]);
+    const badProject = { ...savedV1.projects[0], name: 'Broken', state: { tasks: [{ name: 'no id' }] } };
+    expect(codeOf(JSON.stringify(badProject))).toEqual(['invalid-project', 'Broken']);
+    expect(codeOf(JSON.stringify({ ...savedV1, projects: [savedV1.projects[1], badProject] }))).toEqual(['invalid-project', 'Broken']);
+  });
+
+  it('points a backup at a project that exists', () => {
+    const result = parseImport(JSON.stringify({ ...savedV1, activeProjectId: 'gone' }));
+    expect(result.kind === 'app' && result.storage.activeProjectId).toBe('6f1c2b9e-1d2a-4c51-9a0e-3d1b7c2f8a10');
+  });
+});
+
+describe('safeFileName', () => {
+  it('keeps letters of every script and drops characters file systems refuse', () => {
+    // The old filter kept only ASCII, so every Chinese or Japanese project downloaded as "project".
+    expect(safeFileName('網站 改版', 'project')).toBe('網站-改版');
+    expect(safeFileName('Q3: plan / v2?', 'project')).toBe('Q3-plan-v2');
+    expect(safeFileName('  ', 'project')).toBe('project');
   });
 });

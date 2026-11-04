@@ -18,8 +18,10 @@ import {
 } from '@/lib/projectStorage';
 
 const SAVE_DEBOUNCE_MS = 400;
+/** How long the green "saved" dot stays after a successful write. */
+const SAVED_BADGE_MS = 1500;
 
-export type SaveStatus = 'idle' | 'saving' | 'saved';
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 export interface ProjectsAPI {
   projects: Array<{ id: string; name: string; updatedAt: string; taskCount: number }>;
@@ -49,6 +51,19 @@ export function usePersistentGanttState() {
   const savedStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextSerializeRef = useRef(false);
   const lastSerializedRef = useRef<string>('');
+  const pendingSaveRef = useRef<(() => void) | null>(null);
+
+  /** Show the result of a write: a short "saved", or "not saved" until a later write succeeds. */
+  const reportSave = useCallback((ok: boolean) => {
+    if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
+    if (!ok) {
+      setSaveStatus('error');
+      return;
+    }
+    setSaveStatus('saved');
+    setLastSavedAt(Date.now());
+    savedStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), SAVED_BADGE_MS);
+  }, []);
 
   // Initial load from localStorage (client only)
   useEffect(() => {
@@ -95,7 +110,8 @@ export function usePersistentGanttState() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSaveStatus('saving');
 
-    saveTimerRef.current = setTimeout(() => {
+    const save = () => {
+      pendingSaveRef.current = null;
       const current = storageRef.current;
       if (!current) return;
       const activeIdx = current.projects.findIndex(p => p.id === current.activeProjectId);
@@ -115,26 +131,39 @@ export function usePersistentGanttState() {
         },
       };
       storageRef.current = nextStorage;
-      saveAppStorage(nextStorage);
       setStorage(nextStorage);
       lastSerializedRef.current = payload;
-      setSaveStatus('saved');
-      setLastSavedAt(Date.now());
-
-      if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
-      savedStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 1500);
-    }, SAVE_DEBOUNCE_MS);
+      reportSave(saveAppStorage(nextStorage));
+    };
+    pendingSaveRef.current = save;
+    saveTimerRef.current = setTimeout(save, SAVE_DEBOUNCE_MS);
 
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      pendingSaveRef.current = null;
     };
-  }, [state, hydrated]);
+  }, [state, hydrated, reportSave]);
+
+  // An edit made less than SAVE_DEBOUNCE_MS before the tab is closed or hidden would otherwise
+  // be lost: write it out right away.
+  useEffect(() => {
+    const flush = () => pendingSaveRef.current?.();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
 
   const commitStorage = useCallback((next: AppStorage) => {
     storageRef.current = next;
-    saveAppStorage(next);
     setStorage(next);
-  }, []);
+    reportSave(saveAppStorage(next));
+  }, [reportSave]);
 
   const loadProjectIntoState = useCallback(
     (project: ProjectFile) => {

@@ -37,12 +37,21 @@ import ProjectSwitcher from './ProjectSwitcher';
 import { Segmented, SegmentedButton } from './Segmented';
 import { PROJECT_TITLE, PROJECT_SUBTITLE } from '@/data/defaultProject';
 import { exportToExcel } from '@/lib/exportExcel';
+import { ImportError, type ImportErrorCode } from '@/lib/projectStorage';
+import type { MessageKey } from '@/i18n/messages';
 import type { GanttAction, GanttState, ComputedTask } from '@/types';
 import type { ProjectsAPI, SaveStatus } from '@/hooks/usePersistentGanttState';
 import type { ZoomPreset } from '@/components/GanttApp';
 import { useI18n } from '@/i18n/I18nProvider';
 import { LOCALES, LOCALE_LABELS } from '@/i18n/config';
 import { Languages } from 'lucide-react';
+
+const IMPORT_ERROR_MESSAGES: Record<ImportErrorCode, MessageKey> = {
+  'not-json': 'import.notJson',
+  'unknown-format': 'import.unknownFormat',
+  'no-projects': 'import.noProjects',
+  'invalid-project': 'import.invalidProject',
+};
 
 export interface MenubarProps {
   state: GanttState;
@@ -116,7 +125,7 @@ export default function Menubar(props: MenubarProps) {
         const text = await file.text();
         await projectsApi.importJsonText(text);
       } catch (err) {
-        alert(err instanceof Error ? err.message : t('file.importFailed'));
+        alert(err instanceof ImportError ? t(IMPORT_ERROR_MESSAGES[err.code], { name: err.projectName ?? '' }) : t('file.importFailed'));
       } finally {
         if (jsonInputRef.current) jsonInputRef.current.value = '';
       }
