@@ -60,6 +60,13 @@ test('first visit: welcome dialog, then the sample project with no errors', asyn
   expect(errors).toEqual([]);
 });
 
+test('a finished project opens on its tasks, not on an empty today', async ({ page }) => {
+  // The sample runs March–June 2026; pretend it is November.
+  await page.clock.install({ time: new Date('2026-11-04T10:00:00+08:00') });
+  await openApp(page);
+  await expect(bar(page, 'p1a')).toBeInViewport();
+});
+
 test('a task bar can be edited, moved and resized from the keyboard', async ({ page }) => {
   await openApp(page);
   const p1a = bar(page, 'p1a');

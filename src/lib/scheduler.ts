@@ -251,3 +251,19 @@ export function computeTimelineBounds(
     endDay: maxEnd + TIMELINE_PADDING_AFTER,
   };
 }
+
+/**
+ * The day to bring into view when a project opens: today while the project is under way,
+ * otherwise the start of its first task, so a project that is over (or not started yet) does not
+ * open on an empty stretch of timeline. With nothing scheduled, today.
+ */
+export function initialFocusDay(computed: ComputedTask[], today: number): number {
+  let first = Infinity;
+  let last = -Infinity;
+  computed.forEach(t => {
+    if (Number.isFinite(t.startDayOffset)) first = Math.min(first, t.startDayOffset);
+    if (Number.isFinite(t.endDayOffset)) last = Math.max(last, t.endDayOffset);
+  });
+  if (!Number.isFinite(first)) return today;
+  return today >= first && today <= last ? today : first;
+}

@@ -18,6 +18,7 @@ import { useVirtualRows } from '@/hooks/useVirtualRows';
 import { useDragToConnect } from '@/hooks/useDragToConnect';
 import { buildRowMap } from '@/hooks/useDragReorder';
 import { buildDepPath, buildArrowHead } from '@/lib/depPath';
+import { initialFocusDay } from '@/lib/scheduler';
 import { useI18n } from '@/i18n/I18nProvider';
 
 interface GanttPanelProps {
@@ -40,7 +41,7 @@ export default function GanttPanel({
   const datePointerRef = useRef<HTMLDivElement>(null);
   const dateTooltipRef = useRef<HTMLDivElement>(null);
   const isExtendingRef = useRef(false);
-  const didScrollToTodayRef = useRef(false);
+  const didInitialScrollRef = useRef(false);
   const prevStartRef = useRef(state.timelineStartDay);
 
   const [pointerVisible, setPointerVisible] = useState(false);
@@ -83,21 +84,19 @@ export default function GanttPanel({
 
   const virtualWindow = useVirtualRows(scrollContainerRef, totalRows);
 
-  // Scroll the timeline to today on initial mount (once layout has a width).
+  // On first render (once layout has a width), scroll to today, or to the first task when the
+  // project is over or hasn't started (see initialFocusDay).
   useEffect(() => {
-    if (didScrollToTodayRef.current) return;
+    if (didInitialScrollRef.current) return;
     const el = scrollContainerRef.current;
     if (!el || totalWidth <= 0) return;
-    const today = todayOffset();
-    if (today < state.timelineStartDay || today > state.timelineEndDay) {
-      didScrollToTodayRef.current = true;
-      return;
-    }
-    const todayLeftPx = (today - state.timelineStartDay) * ppd;
-    // Put today at ~25% from the left edge so some past context stays visible.
-    el.scrollLeft = Math.max(0, todayLeftPx - el.clientWidth * 0.25);
-    didScrollToTodayRef.current = true;
-  }, [totalWidth, ppd, state.timelineStartDay, state.timelineEndDay]);
+    const focusDay = initialFocusDay(computed, todayOffset());
+    didInitialScrollRef.current = true;
+    if (focusDay < state.timelineStartDay || focusDay > state.timelineEndDay) return;
+    const leftPx = (focusDay - state.timelineStartDay) * ppd;
+    // Put it at ~25% from the left edge so some earlier context stays visible.
+    el.scrollLeft = Math.max(0, leftPx - el.clientWidth * 0.25);
+  }, [totalWidth, ppd, computed, state.timelineStartDay, state.timelineEndDay]);
 
   const connect = useDragToConnect({
     tasks: state.tasks,
