@@ -8,7 +8,7 @@ import { STATUS_LABEL_KEYS } from '@/i18n/messages';
 import { endOffsetFor } from '@/lib/scheduler';
 import { PIXELS_PER_DAY, ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import type { VirtualWindow } from '@/hooks/useVirtualRows';
-import { buildRowMap, findTaskDropRow, resolveTaskDropTarget, type RowItem } from '@/hooks/useDragReorder';
+import { buildRowMap, findTaskDropRow, resolveTaskDropTarget, taskListRowsEl, type RowItem } from '@/hooks/useDragReorder';
 import type { ConnectDirection } from '@/hooks/useDragToConnect';
 import { useRowHover } from '@/hooks/useRowHover';
 import { updateDepsForTask } from '@/lib/depLineLive';
@@ -225,8 +225,7 @@ export default function TaskBarContainer({
           let dropRow: number | null = null;
           let clampedHoveredRow: number | null = null;
           if (scrollEl) {
-            const listColEl = scrollEl.querySelector('.sticky-col');
-            const listAreaEl = listColEl?.children[1] as HTMLElement | undefined;
+            const listAreaEl = taskListRowsEl(scrollEl);
             if (listAreaEl) {
               const listRect = listAreaEl.getBoundingClientRect();
               const relativeY = ev.clientY - listRect.top;
@@ -370,9 +369,9 @@ export default function TaskBarContainer({
             )
           : null;
 
-        const phaseChanged = !!resolved && resolved.targetPhase !== ds.origPhase;
-        const reorder =
-          !!resolved && (phaseChanged || resolved.insertBeforeTaskId !== undefined);
+        // Any resolved drop target is a move; "append to my own sub-phase" has no insert-before
+        // task but is still a move (it used to be ignored). The reducer skips no-op moves.
+        const reorder = resolved !== null;
 
         const newStartOffset = ds.origStartDayOffset + dayDelta;
         const newDateISO = offsetToISO(newStartOffset);

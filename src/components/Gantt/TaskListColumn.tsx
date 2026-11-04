@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, Plus, FolderOpen, CheckCircle2, Clock4, CircleDashed, GripVertical } from 'lucide-react';
 import { ComputedTask, GanttState, GanttAction, HierarchyMap } from '@/types';
-import { useDragReorder, DragSource } from '@/hooks/useDragReorder';
+import { useDragReorder, DragSource, TASK_LIST_ROWS_ATTR } from '@/hooks/useDragReorder';
 import { useRowHover } from '@/hooks/useRowHover';
 import { ROW_HEIGHT, Z } from '@/lib/ganttLayout';
 import { hueFromString } from '@/lib/colorHash';
@@ -518,7 +518,7 @@ export default function TaskListColumn({
   );
 
   return (
-    <div style={{ position: 'relative', height: totalRows * ROW_HEIGHT, overflow: 'visible' }}>
+    <div {...{ [TASK_LIST_ROWS_ATTR]: '' }} style={{ position: 'relative', height: totalRows * ROW_HEIGHT, overflow: 'visible' }}>
       {rows}
       {!isDragging && addButtons}
 

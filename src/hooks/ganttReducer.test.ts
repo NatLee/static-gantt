@@ -182,3 +182,21 @@ describe('undo / redo', () => {
     expect(h.past[0].tasks[0].duration).toBe(10);
   });
 });
+
+describe('ganttReducer: moving tasks in the list', () => {
+  const tasks = [
+    task('a', { phase: 'Phase 1 UX' }),
+    task('b', { phase: 'Phase 1 UX' }),
+    task('c', { phase: 'Phase 1 UI' }),
+  ];
+
+  it('MOVE_REORDER_TASK without an insert-before task appends to the end of the sub-phase', () => {
+    const s = ganttReducer(stateWith(tasks), { type: 'MOVE_REORDER_TASK', taskId: 'a', targetPhase: 'Phase 1 UX' });
+    expect(s.tasks.map(t => t.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('MOVE_REORDER_TASK to where the task already is changes nothing', () => {
+    const before = stateWith(tasks);
+    expect(ganttReducer(before, { type: 'MOVE_REORDER_TASK', taskId: 'b', targetPhase: 'Phase 1 UX' })).toBe(before);
+  });
+});

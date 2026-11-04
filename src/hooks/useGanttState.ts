@@ -274,7 +274,11 @@ export function ganttReducer(state: GanttState, action: GanttAction): GanttState
       const task = state.tasks.find(t => t.id === action.taskId);
       if (!task) return state;
       const updated = { ...task, phase: action.targetPhase };
-      return { ...state, tasks: moveTaskInto(state.tasks, updated, action.insertBeforeTaskId) };
+      const tasks = moveTaskInto(state.tasks, updated, action.insertBeforeTaskId);
+      const unchanged =
+        updated.phase === task.phase && tasks.every((t, i) => t.id === state.tasks[i].id);
+      // Dropping a task where it already is must not add an empty undo step.
+      return unchanged ? state : { ...state, tasks };
     }
 
     case 'MOVE_TASK_WITH_REORDER': {

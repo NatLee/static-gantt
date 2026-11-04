@@ -22,6 +22,28 @@ async function openApp(page: Page) {
 
 const bar = (page: Page, id: string) => page.locator(`[data-task-id="${id}"]`);
 
+/** Task ids with their phase, in list order, as autosaved to localStorage. */
+function savedOrder(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('gantt-app-v1') ?? 'null');
+    const tasks: { id: string; phase: string }[] = saved?.projects?.[0]?.state?.tasks ?? [];
+    return tasks.map(t => `${t.id}@${t.phase}`);
+  });
+}
+
+/** Press on a bar's centre, move by (dx, dy) in small steps, release. */
+async function dragBar(page: Page, id: string, dx: number, dy: number, holdMs = 0) {
+  const target = bar(page, id);
+  await target.scrollIntoViewIfNeeded();
+  const box = (await target.boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + dx, y + dy, { steps: 8 });
+  if (holdMs) await page.waitForTimeout(holdMs);
+}
+
 test('first visit: welcome dialog, then the sample project with no errors', async ({ page }) => {
   const errors = collectErrors(page);
   await page.addInitScript(() => localStorage.setItem('gantt-locale', 'en'));
@@ -66,20 +88,26 @@ test('a task bar can be edited, moved and resized from the keyboard', async ({ p
   await expect(p1a).toBeFocused();
 });
 
-test('dragging a bar moves it and does not pop up the hover tooltip', async ({ page }) => {
+test('dragging a bar sideways changes its dates only', async ({ page }) => {
   await openApp(page);
-  const p2a = bar(page, 'p2a');
-  await p2a.scrollIntoViewIfNeeded();
-  const box = (await p2a.boundingBox())!;
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
   // Hold longer than the 500 ms hover delay; the tooltip used to open in the middle of the drag.
-  await page.mouse.move(box.x + box.width / 2 + 50, box.y + box.height / 2, { steps: 5 });
-  await page.waitForTimeout(800);
+  await dragBar(page, 'p2a', 50, 0, 800);
   await expect(page.getByRole('tooltip')).toHaveCount(0);
   await page.mouse.up();
   // 50 px at the default week zoom (10 px per day) is five days later.
-  await expect(p2a).toHaveAttribute('aria-label', /2026\/03\/18 to/);
+  await expect(bar(page, 'p2a')).toHaveAttribute('aria-label', /2026\/03\/18 to/);
+  // The drop row used to be measured from the wrong element, one row too low, so this sideways
+  // drag also moved the task into the next sub-phase ("Phase 2 UI").
+  await expect.poll(() => savedOrder(page)).toContain('p2a@Phase 2 UX');
+  expect((await savedOrder(page)).slice(4, 6)).toEqual(['p2a@Phase 2 UX', 'p2b@Phase 2 UX']);
+});
+
+test('dragging a bar down one row puts it below its neighbour', async ({ page }) => {
+  await openApp(page);
+  // p2a's centre moved 60 px down lands in the lower half of p2b's row (rows are 48 px).
+  await dragBar(page, 'p2a', 0, 60);
+  await page.mouse.up();
+  await expect.poll(async () => (await savedOrder(page)).slice(4, 6)).toEqual(['p2b@Phase 2 UX', 'p2a@Phase 2 UX']);
 });
 
 test('menus open and close from the keyboard', async ({ page }) => {

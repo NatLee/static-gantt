@@ -27,6 +27,42 @@ describe('resolveTaskDropTarget', () => {
   });
 });
 
+describe('resolveTaskDropTarget at the end of a group', () => {
+  const tasks = [
+    task('a1', { phase: 'Phase 1 UX', start: '2026-03-01' }),
+    task('a2', { phase: 'Phase 1 UX', start: '2026-03-01' }),
+    task('b1', { phase: 'Phase 1 UI', start: '2026-03-01' }),
+    task('c1', { phase: 'Phase 2 Ship', start: '2026-03-01' }),
+  ];
+  const rows = buildRowMap(hierarchyOf(tasks), 'ALL', new Set(), new Set());
+  const src = { type: 'task' as const, masterPhase: 'Phase 1', subPhase: 'UX', taskId: 'a1' };
+  const gapAfter = (id: string) => rows.findIndex(r => r.taskId === id) + 1;
+
+  // The drop line under the last task of "UX" sits on the row of the "UI" header. That gap used
+  // to resolve to the row below it, sending the task to the end of "UI".
+  it('appends to the sub-phase above the line, not the one below', () => {
+    expect(resolveTaskDropTarget(src, gapAfter('a2'), rows)).toEqual({ targetPhase: 'Phase 1 UX' });
+  });
+
+  it('appends to the last sub-phase of a master phase, not the next master phase', () => {
+    expect(resolveTaskDropTarget(src, gapAfter('b1'), rows)).toEqual({ targetPhase: 'Phase 1 UI' });
+  });
+
+  it('appends to the very last sub-phase at the end of the list', () => {
+    expect(resolveTaskDropTarget(src, rows.length, rows)).toEqual({ targetPhase: 'Phase 2 Ship' });
+  });
+
+  it('puts the task first in a collapsed sub-phase when dropped under its header', () => {
+    const collapsed = buildRowMap(hierarchyOf(tasks), 'ALL', new Set(), new Set(['Phase 1::UI']));
+    const uiHeader = collapsed.findIndex(r => r.type === 'sub-phase' && r.subPhase === 'UI');
+    expect(resolveTaskDropTarget(src, uiHeader + 1, collapsed)).toEqual({ targetPhase: 'Phase 1 UI' });
+  });
+
+  it('does nothing when dropped back into its own slot', () => {
+    expect(resolveTaskDropTarget(src, gapAfter('a1') - 1, rows)).toBeNull();
+  });
+});
+
 describe('buildRowMap', () => {
   it('lists phase, sub-phase and task rows and skips collapsed ones', () => {
     const h = hierarchyOf([

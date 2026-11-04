@@ -22,6 +22,20 @@ export interface DragSource {
   taskId?: string;
 }
 
+/** Marks the element whose top edge is row 0 of the task list (set by TaskListColumn). */
+export const TASK_LIST_ROWS_ATTR = 'data-task-list-rows';
+
+/**
+ * The task list's row container. Drop targets are computed from the pointer's distance to its top
+ * edge, so this must be the element the rows are positioned in. It used to be found as "the second
+ * child of .sticky-col", which became the sidebar's resize handle when the layout changed; every
+ * drop then landed one row too low (a sideways drag could even move a task into the next
+ * sub-phase).
+ */
+export function taskListRowsEl(scrollEl: ParentNode | null): HTMLElement | null {
+  return scrollEl?.querySelector<HTMLElement>(`[${TASK_LIST_ROWS_ATTR}]`) ?? null;
+}
+
 /**
  * Build a RowMap from the hierarchy, respecting filters and collapsed state.
  * Must match the exact same iteration order as TaskListColumn rendering.
@@ -150,11 +164,7 @@ export function useDragReorder(
       const scrollEl = scrollContainerRef.current;
       if (!scrollEl) return;
 
-      const listColEl = scrollEl.querySelector('.sticky-col');
-      if (!listColEl) return;
-
-      // The task list area starts after the header (52px)
-      const listAreaEl = listColEl.children[1] as HTMLElement; // TaskListColumn container
+      const listAreaEl = taskListRowsEl(scrollEl);
       if (!listAreaEl) return;
       const listRect = listAreaEl.getBoundingClientRect();
 
@@ -478,6 +488,12 @@ function dispatchSubPhaseReorder(
  * MOVE_TASK_WITH_REORDER. Shared by left-panel list drag and right-side bar
  * drag so both paths behave identically.
  *
+ * `dropRow` is a gap: the drop line drawn between rowMap[dropRow - 1] and rowMap[dropRow].
+ * With a task below the gap, the dragged task goes in front of it, in that task's sub-phase.
+ * Otherwise the gap closes a group (or the list), and the task is appended to the sub-phase of
+ * the row above. That case used to take the row *below*, so dropping under the last task of
+ * "UX" sent the task to the end of the next sub-phase, "UI".
+ *
  * Leaves `insertBeforeTaskId` undefined to signal "append to target phase"
  * (the reducer handles that by inserting after the last task in targetPhase).
  */
@@ -488,37 +504,20 @@ export function resolveTaskDropTarget(
 ): { targetPhase: string; insertBeforeTaskId?: string } | null {
   if (!source.taskId) return null;
 
-  let targetMaster: string | null = null;
-  let targetSub: string | null = null;
-  let insertBeforeTaskId: string | undefined;
-
-  if (dropRow < rowMap.length) {
-    const item = rowMap[dropRow];
-    targetMaster = item.masterPhase;
-    targetSub = item.subPhase ?? null;
-    if (item.type === 'task' && item.taskId !== source.taskId) {
-      insertBeforeTaskId = item.taskId;
-    }
-    if (!targetSub) {
-      // Landing on a phase header — walk forward to find the first sub-phase
-      for (let i = dropRow; i < rowMap.length; i++) {
-        if (rowMap[i].subPhase && rowMap[i].masterPhase === targetMaster) {
-          targetSub = rowMap[i].subPhase!;
-          break;
-        }
-      }
-    }
-  } else {
-    // dropRow === rowMap.length → append semantics; don't set insertBeforeTaskId.
-    const lastItem = rowMap[rowMap.length - 1];
-    if (lastItem) {
-      targetMaster = lastItem.masterPhase;
-      targetSub = lastItem.subPhase ?? null;
-    }
+  const below = rowMap[dropRow];
+  if (below?.type === 'task' && below.subPhase) {
+    if (below.taskId === source.taskId) return null; // dropped back into its own slot
+    return { targetPhase: joinPhase(below.masterPhase, below.subPhase), insertBeforeTaskId: below.taskId };
   }
 
-  if (!targetMaster || !targetSub) return null;
-  return { targetPhase: joinPhase(targetMaster, targetSub), insertBeforeTaskId };
+  const above = rowMap[dropRow - 1];
+  if (!above) return null;
+  // Under a phase header (its first sub-phase is collapsed): that phase's first sub-phase.
+  const targetSub =
+    above.subPhase ??
+    rowMap.slice(dropRow).find(r => r.masterPhase === above.masterPhase && r.subPhase)?.subPhase;
+  if (!targetSub) return null;
+  return { targetPhase: joinPhase(above.masterPhase, targetSub) };
 }
 
 function dispatchTaskReorder(
