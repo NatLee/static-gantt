@@ -355,12 +355,6 @@ select.custom-select {
   color: var(--text-primary);
   margin: 0;
 }
-.menubar-brand-subtitle {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin: 0;
-}
 
 /* --- Project switcher chip --- */
 .project-switcher {

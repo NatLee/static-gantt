@@ -11,6 +11,12 @@ export function safeFileName(name: string, fallback: string): string {
   return cleaned || fallback;
 }
 
+/** Base name for exported files: the project name, plus the phase filter when one is active. */
+export function exportBaseName(projectName: string, filter = 'ALL'): string {
+  const base = safeFileName(projectName, 'gantt');
+  return filter === 'ALL' ? base : `${base}-${safeFileName(filter, 'phase')}`;
+}
+
 /** Save `blob` through the browser's download prompt. */
 export function downloadBlob(blob: Blob, filename: string): void {
   downloadUrl(URL.createObjectURL(blob), filename, true);

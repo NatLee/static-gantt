@@ -26,6 +26,8 @@ export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 export interface ProjectsAPI {
   projects: Array<{ id: string; name: string; updatedAt: string; taskCount: number }>;
   activeProjectId: string;
+  /** Name of the open project ('' until saved data has loaded). */
+  activeProjectName: string;
   createEmpty: (name?: string) => void;
   createFromDefault: (name?: string) => void;
   duplicateActive: () => void;
@@ -183,6 +185,7 @@ export function usePersistentGanttState() {
         taskCount: p.state.tasks.length,
       })) || [],
     activeProjectId: storage?.activeProjectId || '',
+    activeProjectName: storage ? findActiveProject(storage).name : '',
 
     createEmpty: useCallback(
       (name = 'Untitled Project') => {

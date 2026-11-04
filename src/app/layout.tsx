@@ -9,7 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Gantt Chart - SaaS Platform Launch Plan',
+  title: 'Gantt Studio',
+  description:
+    'Plan projects as a Gantt chart in the browser: drag tasks, link dependencies, see the critical path, and edit the same plan as Mermaid text. Nothing leaves your browser.',
 };
 
 export default function RootLayout({

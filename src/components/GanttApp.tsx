@@ -51,8 +51,7 @@ export default function GanttApp() {
     canRedo,
   } = usePersistentGanttState();
   const { t } = useI18n();
-  const activeProjectName =
-    projects.projects.find(p => p.id === projects.activeProjectId)?.name ?? t('about.appName');
+  const activeProjectName = projects.activeProjectName || t('about.appName');
   const mermaidRef = useRef<MermaidPanelHandle>(null);
   const prevModeRef = useRef(state.currentMode);
   const [projectListOpen, setProjectListOpen] = useState(false);
@@ -181,9 +180,9 @@ export default function GanttApp() {
     const scrollContainer = document.getElementById('gantt-scroll-container');
     if (!target || !scrollContainer) return;
     import('@/lib/exportPng').then(({ exportToPNG }) => {
-      exportToPNG(target, scrollContainer, state.isDark, state.currentFilter, t('export.pngFailed'));
+      exportToPNG(target, scrollContainer, state.isDark, state.currentFilter, activeProjectName, t('export.pngFailed'));
     });
-  }, [state.isDark, state.currentFilter, t]);
+  }, [state.isDark, state.currentFilter, activeProjectName, t]);
 
   const mermaidInsertSection = useCallback(() => mermaidRef.current?.insertSection?.(), []);
   const mermaidInsertTask = useCallback(() => mermaidRef.current?.insertTask?.(), []);

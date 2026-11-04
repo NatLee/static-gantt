@@ -1,8 +1,11 @@
+import { downloadUrl, exportBaseName } from './download';
+
 export async function exportToPNG(
   targetEl: HTMLElement,
   scrollContainer: HTMLElement,
   isDark: boolean,
   filter: string,
+  projectName: string,
   failMessage = 'PNG export failed, please try again.'
 ) {
   const html2canvas = (await import('html2canvas-pro')).default;
@@ -34,10 +37,7 @@ export async function exportToPNG(
     document.body.classList.remove('exporting-mode');
     if (!wasLight) document.documentElement.setAttribute('data-theme', 'dark');
 
-    const link = document.createElement('a');
-    link.download = `SaaS_Roadmap_${filter}.png`;
-    link.href = canvas.toDataURL('image/png', 1.0);
-    link.click();
+    downloadUrl(canvas.toDataURL('image/png', 1.0), `${exportBaseName(projectName, filter)}.png`);
   } catch (e) {
     console.error('Export failed:', e);
     scrollContainer.style.overflow = origOF;

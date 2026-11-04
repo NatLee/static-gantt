@@ -1,7 +1,5 @@
 import { Task, Milestone } from '@/types';
 
-export const PROJECT_TITLE = 'SaaS Platform Launch Plan';
-export const PROJECT_SUBTITLE = 'Strategic Product Roadmap (2026)';
 
 export const defaultTasks: Task[] = [
   // Phase 1: Discovery & Planning (March)

@@ -71,7 +71,7 @@ const en = {
 
   // Export menu
   'export.gantt': 'Gantt',
-  'export.csv': 'CSV (Excel)',
+  'export.csv': 'Excel (.xlsx)',
   'export.png': 'PNG',
   'export.jsonProject': 'JSON (current project)',
   'export.mermaid': 'Mermaid',
@@ -93,7 +93,7 @@ const en = {
   'about.featureVisual': 'Drag-and-drop scheduling with dependencies & critical path',
   'about.featureMermaid': 'Two-way Mermaid Gantt editing',
   'about.featureAutosave': 'Auto-save & multiple projects in your browser',
-  'about.featureExport': 'Export to PNG, CSV and Mermaid',
+  'about.featureExport': 'Export to PNG, Excel and Mermaid',
   'about.builtWith': 'Built with Next.js, React & TypeScript',
 
   // Mode segmented + header buttons

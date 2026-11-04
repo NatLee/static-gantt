@@ -1,6 +1,7 @@
 import { ComputedTask } from '@/types';
 import { offsetToISO } from './dateUtils';
 import { masterOf } from './phase';
+import { exportBaseName } from './download';
 
 export type ExcelRow = Record<string, string | number>;
 
@@ -36,11 +37,11 @@ export function buildExcelRows(tasks: ComputedTask[], filter: string): ExcelRow[
     }));
 }
 
-export async function exportToExcel(tasks: ComputedTask[], filter: string) {
+export async function exportToExcel(tasks: ComputedTask[], filter: string, projectName: string) {
   const mod = await import('xlsx');
   const XLSX = (mod as unknown as { default?: typeof mod }).default ?? mod;
   const ws = XLSX.utils.json_to_sheet(buildExcelRows(tasks, filter));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Roadmap');
-  XLSX.writeFile(wb, `SaaS_Roadmap_${filter}.xlsx`);
+  XLSX.writeFile(wb, `${exportBaseName(projectName, filter)}.xlsx`);
 }

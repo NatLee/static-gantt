@@ -70,7 +70,7 @@ const ja: Record<MessageKey, string> = {
 
   // Export menu
   'export.gantt': 'ガント',
-  'export.csv': 'CSV（Excel）',
+  'export.csv': 'Excel（.xlsx）',
   'export.png': 'PNG',
   'export.jsonProject': 'JSON（現在のプロジェクト）',
   'export.mermaid': 'Mermaid',
@@ -92,7 +92,7 @@ const ja: Record<MessageKey, string> = {
   'about.featureVisual': '依存関係とクリティカルパスに対応したドラッグ＆ドロップのスケジューリング',
   'about.featureMermaid': 'Mermaid ガントチャートの双方向編集',
   'about.featureAutosave': '自動保存とブラウザー内での複数プロジェクト管理',
-  'about.featureExport': 'PNG・CSV・Mermaid へのエクスポート',
+  'about.featureExport': 'PNG・Excel・Mermaid へのエクスポート',
   'about.builtWith': 'Next.js・React・TypeScript で構築',
 
   // Mode segmented + header buttons

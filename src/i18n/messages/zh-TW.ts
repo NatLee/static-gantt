@@ -70,7 +70,7 @@ const zhTW: Record<MessageKey, string> = {
 
   // Export menu
   'export.gantt': '甘特圖',
-  'export.csv': 'CSV（Excel）',
+  'export.csv': 'Excel（.xlsx）',
   'export.png': 'PNG',
   'export.jsonProject': 'JSON（目前專案）',
   'export.mermaid': 'Mermaid',
@@ -92,7 +92,7 @@ const zhTW: Record<MessageKey, string> = {
   'about.featureVisual': '拖放排程，支援相依關係與關鍵路徑',
   'about.featureMermaid': 'Mermaid 甘特圖雙向編輯',
   'about.featureAutosave': '自動儲存，瀏覽器內多專案管理',
-  'about.featureExport': '匯出 PNG、CSV 與 Mermaid',
+  'about.featureExport': '匯出 PNG、Excel 與 Mermaid',
   'about.builtWith': '以 Next.js、React 與 TypeScript 打造',
 
   // Mode segmented + header buttons

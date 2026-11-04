@@ -9,7 +9,7 @@ import {
   saveAppStorage,
   serializeState,
 } from './projectStorage';
-import { safeFileName } from './download';
+import { exportBaseName, safeFileName } from './download';
 import { ganttReducer } from '@/hooks/useGanttState';
 import type { AppStorage, GanttState } from '@/types';
 import savedV1 from '@/test/fixtures/app-storage-v1.json';
@@ -178,5 +178,14 @@ describe('safeFileName', () => {
     expect(safeFileName('網站 改版', 'project')).toBe('網站-改版');
     expect(safeFileName('Q3: plan / v2?', 'project')).toBe('Q3-plan-v2');
     expect(safeFileName('  ', 'project')).toBe('project');
+  });
+});
+
+describe('exportBaseName', () => {
+  it('names exports after the project and the active phase filter', () => {
+    // Every export used to be called "SaaS_Roadmap_<filter>", the sample project's name.
+    expect(exportBaseName('Website relaunch')).toBe('Website-relaunch');
+    expect(exportBaseName('Website relaunch', 'Phase 2')).toBe('Website-relaunch-Phase-2');
+    expect(exportBaseName('', 'ALL')).toBe('gantt');
   });
 });

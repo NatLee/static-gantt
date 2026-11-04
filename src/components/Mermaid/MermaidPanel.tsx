@@ -13,6 +13,7 @@ import { GanttState } from '@/types';
 import { generateMermaid } from '@/lib/mermaidGenerator';
 import { formatMermaid } from '@/lib/mermaidFormat';
 import { todayISO } from '@/lib/dateUtils';
+import { downloadBlob, exportBaseName } from '@/lib/download';
 import CodeMirror from '@uiw/react-codemirror';
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { mermaidLanguage } from '@/lib/codemirror/mermaidLang';
@@ -224,14 +225,8 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
     // --- Export ---
     const handleExportSVG = useCallback(() => {
       if (!svgContent) return;
-      const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'gantt-chart.svg';
-      a.click();
-      URL.revokeObjectURL(url);
-    }, [svgContent]);
+      downloadBlob(new Blob([svgContent], { type: 'image/svg+xml' }), `${exportBaseName(title)}.svg`);
+    }, [svgContent, title]);
 
     const handleExportPNG = useCallback(() => {
       if (!svgContent) return;
@@ -249,18 +244,12 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
         ctx.scale(scale, scale);
         ctx.drawImage(img, 0, 0);
         canvas.toBlob((blob) => {
-          if (!blob) return;
-          const pngUrl = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = pngUrl;
-          a.download = 'gantt-chart.png';
-          a.click();
-          URL.revokeObjectURL(pngUrl);
+          if (blob) downloadBlob(blob, `${exportBaseName(title)}.png`);
         }, 'image/png');
         URL.revokeObjectURL(url);
       };
       img.src = url;
-    }, [svgContent]);
+    }, [svgContent, title]);
 
     const extensions = useMemo(() => [mermaidLanguage], []);
 
@@ -356,13 +345,8 @@ const MermaidPanel = forwardRef<MermaidPanelHandle, MermaidPanelProps>(
 
     const handleDownloadMmd = useCallback(() => {
       const blob = new Blob([codeRef.current], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'gantt-chart.mmd';
-      a.click();
-      URL.revokeObjectURL(url);
-    }, []);
+      downloadBlob(blob, `${exportBaseName(title)}.mmd`);
+    }, [title]);
 
     const handleImportMmd = useCallback(
       (text: string) => {

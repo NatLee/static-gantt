@@ -35,7 +35,6 @@ import {
 import { Menu, MenuItem, MenuDivider, MenuHeading } from './Menu';
 import ProjectSwitcher from './ProjectSwitcher';
 import { Segmented, SegmentedButton } from './Segmented';
-import { PROJECT_TITLE, PROJECT_SUBTITLE } from '@/data/defaultProject';
 import { exportToExcel } from '@/lib/exportExcel';
 import { ImportError, type ImportErrorCode } from '@/lib/projectStorage';
 import type { MessageKey } from '@/i18n/messages';
@@ -163,8 +162,7 @@ export default function Menubar(props: MenubarProps) {
           <Layers className="w-4 h-4 text-white" />
         </div>
         <div className="menubar-brand">
-          <h1 className="menubar-brand-title">{PROJECT_TITLE}</h1>
-          <p className="menubar-brand-subtitle">{PROJECT_SUBTITLE}</p>
+          <h1 className="menubar-brand-title">{t('about.appName')}</h1>
         </div>
         <ProjectSwitcher
           api={projectsApi}
@@ -396,7 +394,7 @@ export default function Menubar(props: MenubarProps) {
           <MenuItem
             icon={<Download className="w-3.5 h-3.5" />}
             label={t('export.csv')}
-            onClick={() => exportToExcel(computed, state.currentFilter)}
+            onClick={() => exportToExcel(computed, state.currentFilter, projectsApi.activeProjectName || t('about.appName'))}
           />
           <MenuItem
             icon={<ImageIcon className="w-3.5 h-3.5" />}
