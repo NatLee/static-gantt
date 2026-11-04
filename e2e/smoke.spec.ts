@@ -66,6 +66,22 @@ test('a task bar can be edited, moved and resized from the keyboard', async ({ p
   await expect(p1a).toBeFocused();
 });
 
+test('dragging a bar moves it and does not pop up the hover tooltip', async ({ page }) => {
+  await openApp(page);
+  const p2a = bar(page, 'p2a');
+  await p2a.scrollIntoViewIfNeeded();
+  const box = (await p2a.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  // Hold longer than the 500 ms hover delay; the tooltip used to open in the middle of the drag.
+  await page.mouse.move(box.x + box.width / 2 + 50, box.y + box.height / 2, { steps: 5 });
+  await page.waitForTimeout(800);
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+  await page.mouse.up();
+  // 50 px at the default week zoom (10 px per day) is five days later.
+  await expect(p2a).toHaveAttribute('aria-label', /2026\/03\/18 to/);
+});
+
 test('menus open and close from the keyboard', async ({ page }) => {
   await openApp(page);
   const file = page.getByRole('button', { name: 'File', exact: true });

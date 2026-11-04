@@ -156,6 +156,11 @@ export default function TaskBarContainer({
 
       const { master: sourceMaster, sub: sourceSub } = splitPhase(task.phase);
 
+      // A hover tooltip that was about to open would otherwise pop up mid-drag.
+      if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+      tooltipTimerRef.current = null;
+      setTooltip(null);
+
       didDragBarRef.current = false;
       dragState.current = {
         type,

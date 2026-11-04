@@ -43,6 +43,7 @@ export default function TaskTooltip({ task, x, y, baseline }: Props) {
 
   return (
     <div
+      role="tooltip"
       className="fixed pointer-events-none z-[95] rounded-lg shadow-xl"
       style={{
         left: x + 14,
